@@ -1,0 +1,4 @@
+adafruit-circuitpython-dht
+flask
+flask-socketio
+eventlet
