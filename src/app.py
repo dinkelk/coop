@@ -6,10 +6,6 @@ import subprocess
 from gevent import monkey
 from datetime import datetime
 
-# Sensors and actuators
-import board
-from dht22 import DHT22
-
 monkey.patch_all()
 
 app = Flask(__name__, template_folder="../templates")
@@ -24,18 +20,26 @@ def get_linux_uptime():
 # Global variables to store data for page:
 temperature = None
 humidity = None
+door_state = None
 lock = Lock()
 
 # Background thread for managing coop in real-time.
 def background():
-    global temperature, humidity
+    import board
+    from dht22 import DHT22
+    from door import DOOR
+
+    global temperature, humidity, door_state
     dht = DHT22(board.D21)
+    door = DOOR()
     while True:
         temp, hum = dht.get_temperature_and_humidity()
-        print("Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp, hum))
+        state = door.get_state()
+        #print("Temperature={0:0.1f}F Humidity={1:0.1f}% Door={s}".format(temp, hum, door.get_state()))
         with lock:
             temperature = temp
             humidity = hum
+            door_state = state
         time.sleep(2.0)
 
 @socketio.on('connect')
@@ -47,9 +51,11 @@ def update_data():
         with lock:
             temp = temperature
             hum = humidity
+            state = door_state
         to_send = {
           'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
           'hum': "%0.1f%%" % hum if hum is not None else "",
+          'state': state if state is not None else "",
           'curtime': str(datetime.now())
         }
         socketio.emit('data', to_send)

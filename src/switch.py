@@ -1,5 +1,5 @@
 import RPi.GPIO as GPIO
-GPIO.setwarnings(False)                                                                                                                                                                                                                                                                     
+GPIO.setwarnings(False)
 import time
 import door
 

@@ -10,6 +10,7 @@
             console.log('Received data:', data);
             document.getElementById('temp').textContent = data.temp;
             document.getElementById('hum').textContent = data.hum;
+            document.getElementById('state').textContent = data.state;
             document.getElementById('curtime').textContent = data.curtime;
         });
     </script>
@@ -20,5 +21,6 @@
     <h2>Uptime: {{ uptime }}</h1>
     <h2>Temperature: <span id="temp"></span></h1>
     <h2>Humidity: <span id="hum"></span></h1>
+    <h2>Door State: <span id="state"></span></h1>
 </body>
 </html>
