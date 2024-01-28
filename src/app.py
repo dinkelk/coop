@@ -18,40 +18,117 @@ def get_linux_uptime():
     return uptime
 
 # Global variables to store data for page:
-temperature = None
-humidity = None
-door_state = None
+global_temperature = None
+global_humidity = None
+global_door_state = None
+global_desired_door_state = "stopped"
 lock = Lock()
+
+def temperature_task():
+    import board
+    from dht22 import DHT22
+    global global_temperature, global_humidity
+    dht = DHT22(board.D21)
+    while True:
+        temp, hum = dht.get_temperature_and_humidity()
+        if temp is not None and hum is not None:
+            print("Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp, hum))
+
+        # Set global temperature and humidity:
+        if temp is not None:
+            with lock:
+                global_temperature = temp
+
+        if hum is not None:
+            with lock:
+                global_humidity = hum
+
+        time.sleep(1.0)
 
 # Background thread for managing coop in real-time.
 def background():
-    import board
-    from dht22 import DHT22
     from door import DOOR
+    global global_door_state, global_desired_door_state
 
-    global temperature, humidity, door_state
-    dht = DHT22(board.D21)
     door = DOOR()
+    door_move_count = 0
+    DOOR_MOVE_MAX = 30
     while True:
-        temp, hum = dht.get_temperature_and_humidity()
-        state = door.get_state()
-        #print("Temperature={0:0.1f}F Humidity={1:0.1f}% Door={s}".format(temp, hum, door.get_state()))
+        # Get state and desired state:
+        door_state = door.get_state()
         with lock:
-            temperature = temp
-            humidity = hum
-            door_state = state
-        time.sleep(2.0)
+            d_door_state = global_desired_door_state
+
+        # Handle door
+        if door_state != d_door_state:
+            match d_door_state:
+                case "stopped":
+                    if door_state in ["open", "closed"]:
+                        door.stop(door_state)
+                        door_move_count = 0
+                    else:
+                        door.stop()
+                        door_move_count = 0
+                case "open":
+                    if door_move_count <= DOOR_MOVE_MAX:
+                        door.open()
+                        door_move_count += 1
+                    else:
+                        door.stop("open")
+                        door_move_count = 0
+                case "closed":
+                    if door_move_count <= DOOR_MOVE_MAX:
+                        door.close()
+                        door_move_count += 1
+                    else:
+                        door.stop("closed")
+                        door_move_count = 0
+                case _:
+                    door.stop()
+                    door_move_count = 0
+                    assert False, "Unknown state: " + str(d_door_state)
+        else:
+            door.stop(door_state)
+            door_move_count = 0
+
+        # Set global state
+        door_state = door.get_state()
+        with lock:
+            global_door_state = door_state
+
+        time.sleep(1.0)
 
 @socketio.on('connect')
 def handle_connect():
     socketio.start_background_task(target=update_data)
 
+@socketio.on('open')
+def handle_open():
+    print('Open button pressed')
+    global global_desired_door_state
+    with lock:
+        global_desired_door_state = "open"
+
+@socketio.on('close')
+def handle_close():
+    print('Close button pressed')
+    global global_desired_door_state
+    with lock:
+        global_desired_door_state = "closed"
+
+@socketio.on('stop')
+def handle_close():
+    print('Stop button pressed')
+    global global_desired_door_state
+    with lock:
+        global_desired_door_state = "stopped"
+
 def update_data():
     while True:
         with lock:
-            temp = temperature
-            hum = humidity
-            state = door_state
+            temp = global_temperature
+            hum = global_humidity
+            state = global_door_state
         to_send = {
           'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
           'hum': "%0.1f%%" % hum if hum is not None else "",
@@ -59,14 +136,14 @@ def update_data():
           'curtime': str(datetime.now())
         }
         socketio.emit('data', to_send)
-        time.sleep(2.0)
+        time.sleep(1.0)
 
 # Route for the home page
 @app.route('/')
 def index():
     # Render the template with temperature and humidity values
     return render_template(
-        'index.html', 
+        'index.html',
         uptime=get_linux_uptime(),
     )
 
@@ -75,6 +152,10 @@ if __name__ == '__main__':
     thread = Thread(target=background)
     thread.daemon = True
     thread.start()
+
+    thread2 = Thread(target=temperature_task)
+    thread2.daemon = True
+    thread2.start()
 
     # Start the Flask app
     socketio.run(app, debug=False, host='0.0.0.0')

@@ -45,11 +45,11 @@ class DOOR():
     def get_state(self):
         return self.state
 
-    def stop(self):
+    def stop(self, state = "stopped"):
         GPIO.output(in1, GPIO.LOW)
         GPIO.output(in2, GPIO.LOW)
         GPIO.output(ena, GPIO.LOW)
-        self.state = "stopped"
+        self.state = state
 
     def open(self):
         GPIO.output(in1, GPIO.LOW)
