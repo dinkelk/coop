@@ -12,6 +12,7 @@ class DOOR():
     def __init__(self):
         # Define state and pins used
         self.state = "stopped"
+        self.override = False
 
         # Set up motor controller:
         GPIO.setmode(GPIO.BCM)
@@ -30,20 +31,27 @@ class DOOR():
         o_read = GPIO.input(o_pin)
         c_read = GPIO.input(c_pin)
         if o_read == c_read:
-            print("Do nothing.")
+            #print("Do nothing.")
+            self.override = False
             self.stop()
         elif o_read == GPIO.HIGH:
-            print("Opening!")
+            #print("Opening!")
+            self.override = True
             self.open()
         elif c_read == GPIO.HIGH:
-            print("Closing!")
+            #print("Closing!")
+            self.override = True
             self.close()
         else:
+            self.override = False
             self.stop()
             assert False
 
     def get_state(self):
         return self.state
+
+    def get_override(self):
+        return self.override
 
     def stop(self, state = "stopped"):
         GPIO.output(in1, GPIO.LOW)

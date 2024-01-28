@@ -11,6 +11,7 @@
             document.getElementById('temp').textContent = data.temp;
             document.getElementById('hum').textContent = data.hum;
             document.getElementById('state').textContent = data.state;
+            document.getElementById('override').textContent = data.override;
             document.getElementById('curtime').textContent = data.curtime;
         });
 
@@ -34,6 +35,7 @@
     <h2>Temperature: <span id="temp"></span></h1>
     <h2>Humidity: <span id="hum"></span></h1>
     <h2>Door State: <span id="state"></span></h1>
+    <h2>Switch State: <span id="override"></span></h1>
     <button onclick="sendOpenCommand()">Open</button>
     <button onclick="sendCloseCommand()">Close</button>
     <button onclick="sendStopCommand()">Stop</button>

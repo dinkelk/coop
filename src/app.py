@@ -21,6 +21,7 @@ def get_linux_uptime():
 global_temperature = None
 global_humidity = None
 global_door_state = None
+global_door_override = False
 global_desired_door_state = "stopped"
 lock = Lock()
 
@@ -48,7 +49,7 @@ def temperature_task():
 # Background thread for managing coop in real-time.
 def background():
     from door import DOOR
-    global global_door_state, global_desired_door_state
+    global global_door_state, global_desired_door_state, global_door_override
 
     door = DOOR()
     door_move_count = 0
@@ -56,11 +57,19 @@ def background():
     while True:
         # Get state and desired state:
         door_state = door.get_state()
+        door_override = door.get_override()
         with lock:
             d_door_state = global_desired_door_state
 
         # Handle door
-        if door_state != d_door_state:
+        if door_override:
+            # Set the desired state to stopped, so that
+            # when override switch is no longer being used,
+            # we don't move the motor until a new button is
+            # pressed.
+            with lock:
+                global_desired_door_state = "stopped"
+        elif door_state != d_door_state:
             match d_door_state:
                 case "stopped":
                     if door_state in ["open", "closed"]:
@@ -93,8 +102,10 @@ def background():
 
         # Set global state
         door_state = door.get_state()
+        door_override = door.get_override()
         with lock:
             global_door_state = door_state
+            global_door_override = door_override
 
         time.sleep(1.0)
 
@@ -129,10 +140,12 @@ def update_data():
             temp = global_temperature
             hum = global_humidity
             state = global_door_state
+            override = global_door_override
         to_send = {
           'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
           'hum': "%0.1f%%" % hum if hum is not None else "",
           'state': state if state is not None else "",
+          'override': state if override else "off",
           'curtime': str(datetime.now())
         }
         socketio.emit('data', to_send)
