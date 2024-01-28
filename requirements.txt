@@ -2,3 +2,5 @@ adafruit-circuitpython-dht
 flask
 flask-socketio
 eventlet
+gevent
+gevent-websocket

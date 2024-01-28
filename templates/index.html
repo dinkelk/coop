@@ -2,12 +2,23 @@
 <html>
 <head>
     <title>Dinky Coop</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
+    <script>
+        var socket = io();
+
+        socket.on('data', function(data) {
+            console.log('Received data:', data);
+            document.getElementById('temp').textContent = data.temp;
+            document.getElementById('hum').textContent = data.hum;
+            document.getElementById('curtime').textContent = data.curtime;
+        });
+    </script>
 </head>
 <body>
     <h1>Dinky Coop</h1>
-    <h2>Current Time: {{ curtime }}</h1>
+    <h2>Current Time: <span id="curtime"></span></h1>
     <h2>Uptime: {{ uptime }}</h1>
-    <h2>Temperature: {{ temperature }}°F</h1>
-    <h2>Humidity: {{ humidity }}%</h1>
+    <h2>Temperature: <span id="temp"></span></h1>
+    <h2>Humidity: <span id="hum"></span></h1>
 </body>
 </html>

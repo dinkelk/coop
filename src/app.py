@@ -1,10 +1,20 @@
 from flask import Flask, render_template
 from threading import Thread, Lock
-import dht22
+from flask_socketio import SocketIO, emit
 import time
 import subprocess
+from gevent import monkey
+from datetime import datetime
+
+# Sensors and actuators
+import board
+from dht22 import DHT22
+
+monkey.patch_all()
 
 app = Flask(__name__, template_folder="../templates")
+app.config['SECRET_KEY'] = 'secret_key'
+socketio = SocketIO(app, async_mode='gevent')
 
 def get_linux_uptime():
     output = subprocess.check_output('uptime -s', shell=True)
@@ -19,7 +29,7 @@ lock = Lock()
 # Background thread for managing coop in real-time.
 def background():
     global temperature, humidity
-    dht = dht22.DHT()
+    dht = DHT22(board.D21)
     while True:
         temp, hum = dht.get_temperature_and_humidity()
         print("Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp, hum))
@@ -28,35 +38,31 @@ def background():
             humidity = hum
         time.sleep(2.0)
 
+@socketio.on('connect')
+def handle_connect():
+    socketio.start_background_task(target=update_data)
+
+def update_data():
+    while True:
+        with lock:
+            temp = temperature
+            hum = humidity
+        to_send = {
+          'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
+          'hum': "%0.1f%%" % hum if hum is not None else "",
+          'curtime': str(datetime.now())
+        }
+        socketio.emit('data', to_send)
+        time.sleep(2.0)
+
 # Route for the home page
 @app.route('/')
 def index():
-    # Read temperature and humidity from sensor
-    with lock:
-        temp = temperature
-        hum = humidity
-
-    from datetime import datetime
-
-    current_time = datetime.now()
-
     # Render the template with temperature and humidity values
     return render_template(
         'index.html', 
-        temperature=("{0:0.1f}".format(temp) if temp is not None else None),
-        humidity=("{0:0.1f}".format(hum) if hum is not None else None),
         uptime=get_linux_uptime(),
-        curtime=current_time
     )
-
-# Route for controlling the linear actuator
-@app.route('/actuator/<action>')
-def actuator(action):
-    # Code to control the linear actuator based on the action parameter
-    # For example, you can use GPIO libraries to control the actuator
-
-    # Return a response indicating the action performed
-    return f'Actuator {action}'
 
 if __name__ == '__main__':
     # Start the background thread
@@ -65,4 +71,4 @@ if __name__ == '__main__':
     thread.start()
 
     # Start the Flask app
-    app.run(debug=False, host='0.0.0.0')
+    socketio.run(app, debug=False, host='0.0.0.0')
