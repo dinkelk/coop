@@ -20,6 +20,7 @@ def get_linux_uptime():
 # Global variables to store data for page:
 global_temperature = None
 global_humidity = None
+global_cpu_temp = None
 global_door_state = None
 global_door_override = False
 global_desired_door_state = "stopped"
@@ -28,7 +29,8 @@ lock = Lock()
 def temperature_task():
     import board
     from dht22 import DHT22
-    global global_temperature, global_humidity
+    from gpiozero import CPUTemperature
+    global global_temperature, global_humidity, global_cpu_temp
     dht = DHT22(board.D21)
     while True:
         temp, hum = dht.get_temperature_and_humidity()
@@ -44,6 +46,10 @@ def temperature_task():
             with lock:
                 global_humidity = hum
 
+        cpu_temp = CPUTemperature().temperature
+        with lock:
+            global_cpu_temp = cpu_temp
+
         time.sleep(1.0)
 
 # Background thread for managing coop in real-time.
@@ -53,7 +59,7 @@ def background():
 
     door = DOOR()
     door_move_count = 0
-    DOOR_MOVE_MAX = 30
+    DOOR_MOVE_MAX = 20
     while True:
         # Get state and desired state:
         door_state = door.get_state()
@@ -141,9 +147,11 @@ def update_data():
             hum = global_humidity
             state = global_door_state
             override = global_door_override
+            cpu_temp = global_cpu_temp
         to_send = {
           'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
           'hum': "%0.1f%%" % hum if hum is not None else "",
+          'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
           'state': state if state is not None else "",
           'override': state if override else "off",
           'curtime': str(datetime.now())

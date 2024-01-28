@@ -10,6 +10,7 @@
             console.log('Received data:', data);
             document.getElementById('temp').textContent = data.temp;
             document.getElementById('hum').textContent = data.hum;
+            document.getElementById('cpu_temp').textContent = data.cpu_temp;
             document.getElementById('state').textContent = data.state;
             document.getElementById('override').textContent = data.override;
             document.getElementById('curtime').textContent = data.curtime;
@@ -30,14 +31,16 @@
 </head>
 <body>
     <h1>Dinky Coop</h1>
-    <h2>Current Time: <span id="curtime"></span></h1>
-    <h2>Uptime: {{ uptime }}</h1>
-    <h2>Temperature: <span id="temp"></span></h1>
-    <h2>Humidity: <span id="hum"></span></h1>
-    <h2>Door State: <span id="state"></span></h1>
-    <h2>Switch State: <span id="override"></span></h1>
+    <h2>Current Time: <span id="curtime"></span></h2>
+    <h2>Uptime: {{ uptime }}</h2>
+    <h2>CPU Temperature: <span id="cpu_temp"></span></h2>
+    <h2>Temperature: <span id="temp"></span></h2>
+    <h2>Humidity: <span id="hum"></span></h2>
+    <h2>Door State: <span id="state"></span></h2>
+    <h2>Switch State: <span id="override"></span></h2>
     <button onclick="sendOpenCommand()">Open</button>
     <button onclick="sendCloseCommand()">Close</button>
     <button onclick="sendStopCommand()">Stop</button>
+    <h2>other pi telemetry and stuff like temp and voltages?</h2>
 </body>
 </html>
