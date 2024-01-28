@@ -1,23 +1,24 @@
 from flask import Flask, render_template
 from threading import Thread, Lock
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 import time
-import subprocess
 from gevent import monkey
 from datetime import datetime
+import psutil
+
+##################################
+# Flask configuration:
+##################################
 
 monkey.patch_all()
-
 app = Flask(__name__, template_folder="../templates")
 app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app, async_mode='gevent')
 
-def get_linux_uptime():
-    output = subprocess.check_output('uptime -s', shell=True)
-    uptime = output.decode().strip()
-    return uptime
+##################################
+# Shared global variables:
+##################################
 
-# Global variables to store data for page:
 global_temperature = None
 global_humidity = None
 global_cpu_temp = None
@@ -25,6 +26,30 @@ global_door_state = None
 global_door_override = False
 global_desired_door_state = "stopped"
 lock = Lock()
+
+##################################
+# Helper functions:
+##################################
+
+# Get system uptime in seconds
+uptime_seconds = psutil.boot_time()
+uptime_datetime = datetime.fromtimestamp(uptime_seconds)
+
+def get_uptime():
+    # Calculate the time difference between now and the uptime
+    uptime_delta = datetime.now() - uptime_datetime
+
+    # Extract days, hours, minutes, and seconds from the time difference
+    days = uptime_delta.days
+    hours, remainder = divmod(uptime_delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Return system uptime string
+    return f"{days} day(s), {hours} hour(s), {minutes} minute(s), {seconds} second(s)"
+
+##################################
+# Background tasks:
+##################################
 
 def temperature_task():
     import board
@@ -52,8 +77,8 @@ def temperature_task():
 
         time.sleep(1.0)
 
-# Background thread for managing coop in real-time.
-def background():
+# Background thread for managing coop door in real-time.
+def door_task():
     from door import DOOR
     global global_door_state, global_desired_door_state, global_door_override
 
@@ -115,9 +140,32 @@ def background():
 
         time.sleep(1.0)
 
+def data_update_task():
+    while True:
+        with lock:
+            temp = global_temperature
+            hum = global_humidity
+            state = global_door_state
+            override = global_door_override
+            cpu_temp = global_cpu_temp
+        to_send = {
+          'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
+          'hum': "%0.1f%%" % hum if hum is not None else "",
+          'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
+          'state': state if state is not None else "",
+          'override': state if override else "off",
+          'uptime': str(get_uptime())
+        }
+        socketio.emit('data', to_send)
+        time.sleep(1.0)
+
+##################################
+# Websocket handlers:
+##################################
+
 @socketio.on('connect')
 def handle_connect():
-    socketio.start_background_task(target=update_data)
+    socketio.start_background_task(target=data_update_task)
 
 @socketio.on('open')
 def handle_open():
@@ -134,30 +182,15 @@ def handle_close():
         global_desired_door_state = "closed"
 
 @socketio.on('stop')
-def handle_close():
+def handle_stop():
     print('Stop button pressed')
     global global_desired_door_state
     with lock:
         global_desired_door_state = "stopped"
 
-def update_data():
-    while True:
-        with lock:
-            temp = global_temperature
-            hum = global_humidity
-            state = global_door_state
-            override = global_door_override
-            cpu_temp = global_cpu_temp
-        to_send = {
-          'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
-          'hum': "%0.1f%%" % hum if hum is not None else "",
-          'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
-          'state': state if state is not None else "",
-          'override': state if override else "off",
-          'curtime': str(datetime.now())
-        }
-        socketio.emit('data', to_send)
-        time.sleep(1.0)
+##################################
+# Static page handlers:
+##################################
 
 # Route for the home page
 @app.route('/')
@@ -165,15 +198,20 @@ def index():
     # Render the template with temperature and humidity values
     return render_template(
         'index.html',
-        uptime=get_linux_uptime(),
+        #uptime=get_linux_uptime(),
     )
 
+##################################
+# Startup:
+##################################
+
 if __name__ == '__main__':
-    # Start the background thread
-    thread = Thread(target=background)
+    # Start the task that manages the door:
+    thread = Thread(target=door_task)
     thread.daemon = True
     thread.start()
 
+    # Start the task that grabs temperature data:
     thread2 = Thread(target=temperature_task)
     thread2.daemon = True
     thread2.start()

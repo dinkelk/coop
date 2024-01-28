@@ -4,3 +4,5 @@ flask-socketio
 eventlet
 gevent
 gevent-websocket
+psutil
+gpiozero
