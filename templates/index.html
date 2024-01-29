@@ -14,6 +14,10 @@
             document.getElementById('state').textContent = data.state;
             document.getElementById('override').textContent = data.override;
             document.getElementById('uptime').textContent = data.uptime;
+            document.getElementById('sunrise').textContent = data.sunrise;
+            document.getElementById('sunset').textContent = data.sunset;
+            document.getElementById('tu_sunrise').textContent = data.tu_sunrise;
+            document.getElementById('tu_sunset').textContent = data.tu_sunset;
         });
 
         function sendOpenCommand() {
@@ -32,6 +36,10 @@
 <body>
     <h1>Dinky Coop</h1>
     <h2>System Uptime: <span id="uptime"></span></h2>
+    <h2>Today's Sunrise: <span id="sunrise"></span></h2>
+    <h2>Time Until Sunrise: <span id="tu_sunrise"></span></h2>
+    <h2>Today's Sunset: <span id="sunset"></span></h2>
+    <h2>Time Until Sunset: <span id="tu_sunset"></span></h2>
     <h2>CPU Temperature: <span id="cpu_temp"></span></h2>
     <h2>Temperature: <span id="temp"></span></h2>
     <h2>Humidity: <span id="hum"></span></h2>

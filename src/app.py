@@ -3,8 +3,9 @@ from threading import Thread, Lock
 from flask_socketio import SocketIO
 import time
 from gevent import monkey
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import psutil
+import pytz
 
 ##################################
 # Flask configuration:
@@ -25,6 +26,10 @@ global_cpu_temp = None
 global_door_state = None
 global_door_override = False
 global_desired_door_state = "stopped"
+global_sunrise = None
+global_sunset = None
+global_sunrise = None
+global_sunset = None
 lock = Lock()
 
 ##################################
@@ -46,6 +51,20 @@ def get_uptime():
 
     # Return system uptime string
     return f"{days} day(s), {hours} hour(s), {minutes} minute(s), {seconds} second(s)"
+
+from astral import LocationInfo
+from astral.sun import sun
+
+# Define the location of Boulder, Colorado
+boulder = LocationInfo("Boulder", "USA", "America/Denver", 40.01499, -105.27055)
+timezone = pytz.timezone('America/Denver')
+
+def get_sunrise_and_sunset():
+    # Get the sunrise and sunset times for today
+    s = sun(boulder.observer, date=date.today(), tzinfo=boulder.timezone)
+
+    # Convert sunrise and sunset to the desired timezone (e.g., 'America/Denver')
+    return s["sunrise"].astimezone(timezone), s["sunset"].astimezone(timezone)
 
 ##################################
 # Background tasks:
@@ -80,7 +99,7 @@ def temperature_task():
 # Background thread for managing coop door in real-time.
 def door_task():
     from door import DOOR
-    global global_door_state, global_desired_door_state, global_door_override
+    global global_door_state, global_desired_door_state, global_door_override, global_sunrise, global_sunset
 
     door = DOOR()
     door_move_count = 0
@@ -92,7 +111,22 @@ def door_task():
         with lock:
             d_door_state = global_desired_door_state
 
-        # Handle door
+        # Get the current sunrise and sunset time:
+        sunrise, sunset = get_sunrise_and_sunset()
+        current_time = timezone.localize(datetime.now())
+        time_window = timedelta(minutes=1)
+
+        # If we are in the 1 minute after sunrise, command the desired door
+        # state to open.
+        if current_time > sunrise and current_time < sunrise + time_window:
+            global_desired_door_state = "open"
+
+        # If we are in the 1 minute after sunset, command the desired door
+        # state to closed.
+        if current_time > sunset and current_time < sunset + time_window:
+            global_desired_door_state = "closed"
+
+        # Handle door:
         if door_override:
             # Set the desired state to stopped, so that
             # when override switch is no longer being used,
@@ -137,6 +171,8 @@ def door_task():
         with lock:
             global_door_state = door_state
             global_door_override = door_override
+            global_sunrise = sunrise
+            global_sunset = sunset
 
         time.sleep(1.0)
 
@@ -148,13 +184,41 @@ def data_update_task():
             state = global_door_state
             override = global_door_override
             cpu_temp = global_cpu_temp
+            sunrise = global_sunrise
+            sunset = global_sunset
+
+
+        # Check if time until sunrise is positive
+        time_until_sunrise_str = None
+        time_until_sunset_str = None
+        if sunrise is not None and sunset is not None:
+            # Assuming sunrise and sunset are datetime objects
+            current_time = timezone.localize(datetime.now())
+            time_until_sunrise = sunrise - current_time
+            time_until_sunset = sunset - current_time
+
+            if time_until_sunrise > timedelta(0):
+                time_until_sunrise_str = (datetime.min + time_until_sunrise).strftime("%H:%M:%S")
+            else:
+                time_until_sunrise_str = "passed"
+
+            # Check if time until sunset is positive
+            if time_until_sunset > timedelta(0):
+                time_until_sunset_str = (datetime.min + time_until_sunset).strftime("%H:%M:%S")
+            else:
+                time_until_sunset_str = "passed"
+
         to_send = {
           'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
           'hum': "%0.1f%%" % hum if hum is not None else "",
           'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
           'state': state if state is not None else "",
           'override': state if override else "off",
-          'uptime': str(get_uptime())
+          'uptime': str(get_uptime()),
+          'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
+          'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
+          'tu_sunrise': time_until_sunrise_str if time_until_sunrise_str is not None else "",
+          'tu_sunset': time_until_sunset_str if time_until_sunset_str is not None else ""
         }
         socketio.emit('data', to_send)
         time.sleep(1.0)

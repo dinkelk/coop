@@ -6,3 +6,4 @@ gevent
 gevent-websocket
 psutil
 gpiozero
+astral
