@@ -30,6 +30,7 @@ global_sunrise = None
 global_sunset = None
 global_sunrise = None
 global_sunset = None
+global_auto_mode = True
 lock = Lock()
 
 ##################################
@@ -110,21 +111,25 @@ def door_task():
         door_override = door.get_override()
         with lock:
             d_door_state = global_desired_door_state
+            auto_mode = global_auto_mode
 
-        # Get the current sunrise and sunset time:
-        sunrise, sunset = get_sunrise_and_sunset()
-        current_time = timezone.localize(datetime.now())
-        time_window = timedelta(minutes=1)
+        # If we are in auto mode then open or close the door based on sunrise
+        # or sunset times.
+        if auto_mode:
+            # Get the current sunrise and sunset time:
+            sunrise, sunset = get_sunrise_and_sunset()
+            current_time = timezone.localize(datetime.now())
+            time_window = timedelta(minutes=1)
 
-        # If we are in the 1 minute after sunrise, command the desired door
-        # state to open.
-        if current_time > sunrise and current_time < sunrise + time_window:
-            global_desired_door_state = "open"
+            # If we are in the 1 minute after sunrise, command the desired door
+            # state to open.
+            if current_time > sunrise and current_time < sunrise + time_window:
+                global_desired_door_state = "open"
 
-        # If we are in the 1 minute after sunset, command the desired door
-        # state to closed.
-        if current_time > sunset and current_time < sunset + time_window:
-            global_desired_door_state = "closed"
+            # If we are in the 1 minute after sunset, command the desired door
+            # state to closed.
+            if current_time > sunset and current_time < sunset + time_window:
+                global_desired_door_state = "closed"
 
         # Handle door:
         if door_override:
@@ -252,6 +257,19 @@ def handle_stop():
     with lock:
         global_desired_door_state = "stopped"
 
+@socketio.on('toggle')
+def handle_toggle(message):
+    global global_auto_mode
+    toggle_value = message['toggle']
+    if toggle_value:
+        print('Auto Mode Enabled')
+        with lock:
+            global_auto_mode = True
+    else:
+        with lock:
+            global_auto_mode = False
+        print('Auto Mode Disabled')
+
 ##################################
 # Static page handlers:
 ##################################
@@ -259,10 +277,14 @@ def handle_stop():
 # Route for the home page
 @app.route('/')
 def index():
+    with lock:
+        auto_mode = global_auto_mode
+
+    print("rendering with auto mode: " + str(auto_mode))
     # Render the template with temperature and humidity values
     return render_template(
         'index.html',
-        #uptime=get_linux_uptime(),
+        auto_mode=auto_mode
     )
 
 ##################################

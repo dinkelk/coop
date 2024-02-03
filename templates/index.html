@@ -2,6 +2,149 @@
 <html>
 <head>
     <title>Dinky Coop</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 0;
+            }
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .toggle {
+            width: 100px;
+            height: 50px;
+            background-color: #aaa;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .toggle:before {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 46px;
+            height: 46px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle.on {
+          background-color: #8bc34a;
+        }
+
+        .toggle.on:before {
+            transform: translateX(50px);
+        }
+
+        .toggle-label {
+            margin-left: 10px;
+            font-size: 20px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        td:first-child {
+            width: 30%;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .button.stop {
+            background-color: #ff6f6f;
+        }
+
+        .button.open,
+        .button.close {
+            background-color: #999;
+        }
+
+        .button:last-child {
+            margin-right: 0;
+        }
+
+        .button:hover {
+            opacity: 0.8;
+        }
+
+        .capitalize {
+            text-transform: capitalize;
+        }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
     <script>
         var socket = io();
@@ -31,22 +174,83 @@
         function sendStopCommand() {
             socket.emit('stop');
         }
+
+        function toggleSwitch() {
+            var toggle = document.getElementById('toggle');
+            toggle.classList.toggle('on');
+            var isOn = toggle.classList.contains('on');
+            socket.emit('toggle', { toggle: isOn });
+        }
     </script>
 </head>
 <body>
-    <h1>Dinky Coop</h1>
-    <h2>System Uptime: <span id="uptime"></span></h2>
-    <h2>Today's Sunrise: <span id="sunrise"></span></h2>
-    <h2>Time Until Sunrise: <span id="tu_sunrise"></span></h2>
-    <h2>Today's Sunset: <span id="sunset"></span></h2>
-    <h2>Time Until Sunset: <span id="tu_sunset"></span></h2>
-    <h2>CPU Temperature: <span id="cpu_temp"></span></h2>
-    <h2>Temperature: <span id="temp"></span></h2>
-    <h2>Humidity: <span id="hum"></span></h2>
-    <h2>Door State: <span id="state"></span></h2>
-    <h2>Switch State: <span id="override"></span></h2>
-    <button onclick="sendOpenCommand()">Open</button>
-    <button onclick="sendCloseCommand()">Close</button>
-    <button onclick="sendStopCommand()">Stop</button>
+    <div class="container">
+        <div class="content">
+            <h1>Dinky Coop</h1>
+            <h3>System</h3>
+            <table>
+                <tr>
+                    <td><b>Uptime</b></td>
+                    <td><span id="uptime"></span></td>
+                </tr>
+                <tr>
+                    <td><b>CPU Temperature</b></td>
+                    <td><span id="cpu_temp"></span></td>
+                </tr>
+            </table>
+            <h3>Outside</h3>
+            <table>
+                <tr>
+                    <td><b>Temperature</b></td>
+                    <td><span id="temp"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Humidity</b></td>
+                    <td><span id="hum"></span></td>
+                </tr>
+            </table>
+            <h3>Inside</h3>
+            <table>
+                <tr>
+                    <td><b>Temperature</b></td>
+                    <td><span id="temp2"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Humidity</b></td>
+                    <td><span id="hum2"></span></td>
+                </tr>
+            </table>
+            <h3>Door</h3>
+            <table>
+                <tr>
+                    <td><b>Door</b></td>
+                    <td><span id="state"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Switch</b></td>
+                    <td><span id="override"></span></td>
+                </tr>
+            </table>
+            <div class="button-container">
+                <button class="button close" onclick="sendCloseCommand()">Close</button>
+                <button class="button stop" onclick="sendStopCommand()">Stop</button>
+                <button class="button open" onclick="sendOpenCommand()">Open</button>
+            </div>
+            <div class="toggle-container">
+                <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
+                <span class="toggle-label">Automatic Mode</span>
+            </div>
+            <table>
+                <tr>
+                    <td>Today's Sunrise: <span id="sunrise"></span></td>
+                    <td>Today's Sunset: <span id="sunset"></span></td>
+                </tr>
+                <tr>
+                    <td>Time Until Sunrise: <span id="tu_sunrise"></span></td>
+                    <td>Time Until Sunset: <span id="tu_sunset"></span></td>
+                </tr>
+            </table>
+        </div>
+    </div>
 </body>
 </html>
