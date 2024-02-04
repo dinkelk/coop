@@ -24,3 +24,10 @@ $ killall libgpiod_pulsein64
 $ flask src/app.py
 ```
 
+## TODO
+
+  1. Sunrise / sunset offsets
+  2. Log data to file, one file per day
+  3. Show daily max and min temperature and humidity (min (blue), current (black), max (orange))
+  4. Show temp/humidity plot of last 36 hours
+  5. Make webpage look nicer, photos, animations, icons
