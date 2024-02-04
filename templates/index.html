@@ -151,8 +151,10 @@
 
         socket.on('data', function(data) {
             console.log('Received data:', data);
-            document.getElementById('temp').textContent = data.temp;
-            document.getElementById('hum').textContent = data.hum;
+            document.getElementById('temp_in').textContent = data.temp_in;
+            document.getElementById('hum_in').textContent = data.hum_in;
+            document.getElementById('temp_out').textContent = data.temp_out;
+            document.getElementById('hum_out').textContent = data.hum_out;
             document.getElementById('cpu_temp').textContent = data.cpu_temp;
             document.getElementById('state').textContent = data.state;
             document.getElementById('override').textContent = data.override;
@@ -202,52 +204,60 @@
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
-                    <td><span id="temp"></span></td>
+                    <td><span id="temp_out"></span></td>
                 </tr>
                 <tr>
                     <td><b>Humidity</b></td>
-                    <td><span id="hum"></span></td>
+                    <td><span id="hum_out"></span></td>
                 </tr>
             </table>
             <h3>Inside</h3>
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
-                    <td><span id="temp2"></span></td>
+                    <td><span id="temp_in"></span></td>
                 </tr>
                 <tr>
                     <td><b>Humidity</b></td>
-                    <td><span id="hum2"></span></td>
+                    <td><span id="hum_in"></span></td>
                 </tr>
             </table>
-            <h3>Door</h3>
-            <table>
-                <tr>
-                    <td><b>Door</b></td>
-                    <td><span id="state"></span></td>
-                </tr>
-                <tr>
-                    <td><b>Switch</b></td>
-                    <td><span id="override"></span></td>
-                </tr>
-            </table>
+            <h3>Door Control</h3>
             <div class="button-container">
                 <button class="button close" onclick="sendCloseCommand()">Close</button>
                 <button class="button stop" onclick="sendStopCommand()">Stop</button>
                 <button class="button open" onclick="sendOpenCommand()">Open</button>
             </div>
+            <table>
+                <tr>
+                    <td><b>Door Position</b></td>
+                    <td><span id="state"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Switch Position</b></td>
+                    <td><span id="override"></span></td>
+                </tr>
+            </table>
             <div class="toggle-container">
                 <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
                 <span class="toggle-label">Automatic Mode</span>
             </div>
             <table>
                 <tr>
-                    <td>Today's Sunrise: <span id="sunrise"></span></td>
-                    <td>Today's Sunset: <span id="sunset"></span></td>
+                    <td><b>Sunrise</b></td>
+                    <td><span id="sunrise"></span></td>
                 </tr>
                 <tr>
-                    <td>Time Until Sunrise: <span id="tu_sunrise"></span></td>
-                    <td>Time Until Sunset: <span id="tu_sunset"></span></td>
+                    <td><b>Sunset</b></td>
+                    <td><span id="sunset"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Door Opens in</b></td>
+                    <td><span id="tu_sunrise"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Door Closes in</b></td>
+                    <td><span id="tu_sunset"></span></td>
                 </tr>
             </table>
         </div>

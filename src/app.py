@@ -20,8 +20,10 @@ socketio = SocketIO(app, async_mode='gevent')
 # Shared global variables:
 ##################################
 
-global_temperature = None
-global_humidity = None
+global_temp_in = None
+global_hum_in = None
+global_temp_out = None
+global_hum_out = None
 global_cpu_temp = None
 global_door_state = None
 global_door_override = False
@@ -75,21 +77,30 @@ def temperature_task():
     import board
     from dht22 import DHT22
     from gpiozero import CPUTemperature
-    global global_temperature, global_humidity, global_cpu_temp
-    dht = DHT22(board.D21)
+    global global_temp_in, global_hum_in, global_temp_out, global_hum_out, global_cpu_temp
+    dht_out = DHT22(board.D21)
+    dht_in = DHT22(board.D20)
     while True:
-        temp, hum = dht.get_temperature_and_humidity()
-        if temp is not None and hum is not None:
-            print("Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp, hum))
+        temp_out, hum_out = dht_out.get_temperature_and_humidity()
+        temp_in, hum_in = dht_in.get_temperature_and_humidity()
+        if temp_out is not None and hum_out is not None:
+            print("Outside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_out, hum_out))
+        if temp_in is not None and hum_in is not None:
+            print("Inside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_in, hum_in))
 
         # Set global temperature and humidity:
-        if temp is not None:
+        if temp_in is not None:
             with lock:
-                global_temperature = temp
-
-        if hum is not None:
+                global_temp_in = temp_in
+        if temp_out is not None:
             with lock:
-                global_humidity = hum
+                global_temp_out = temp_out
+        if hum_in is not None:
+            with lock:
+                global_hum_in = hum_in
+        if hum_out is not None:
+            with lock:
+                global_hum_out = hum_out
 
         cpu_temp = CPUTemperature().temperature
         with lock:
@@ -104,7 +115,7 @@ def door_task():
 
     door = DOOR()
     door_move_count = 0
-    DOOR_MOVE_MAX = 20
+    DOOR_MOVE_MAX = 35
     while True:
         # Get state and desired state:
         door_state = door.get_state()
@@ -184,19 +195,24 @@ def door_task():
 def data_update_task():
     while True:
         with lock:
-            temp = global_temperature
-            hum = global_humidity
+            temp_in = global_temp_in
+            hum_in = global_hum_in
+            temp_out = global_temp_out
+            hum_out = global_hum_out
             state = global_door_state
             override = global_door_override
             cpu_temp = global_cpu_temp
             sunrise = global_sunrise
             sunset = global_sunset
-
+            auto_mode = global_auto_mode
 
         # Check if time until sunrise is positive
         time_until_sunrise_str = None
         time_until_sunset_str = None
-        if sunrise is not None and sunset is not None:
+        if auto_mode == False:
+            time_until_sunrise_str = "disabled"
+            time_until_sunset_str = "disabled"
+        elif sunrise is not None and sunset is not None:
             # Assuming sunrise and sunset are datetime objects
             current_time = timezone.localize(datetime.now())
             time_until_sunrise = sunrise - current_time
@@ -214,8 +230,10 @@ def data_update_task():
                 time_until_sunset_str = "passed"
 
         to_send = {
-          'temp': ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + "F" if temp is not None else "",
-          'hum': "%0.1f%%" % hum if hum is not None else "",
+          'temp_in': ("%0.1f" % temp_in) + u'\N{DEGREE SIGN}' + "F" if temp_in is not None else "",
+          'hum_in': "%0.1f%%" % hum_in if hum_in is not None else "",
+          'temp_out': ("%0.1f" % temp_out) + u'\N{DEGREE SIGN}' + "F" if temp_out is not None else "",
+          'hum_out': "%0.1f%%" % hum_out if hum_out is not None else "",
           'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
           'state': state if state is not None else "",
           'override': state if override else "off",
