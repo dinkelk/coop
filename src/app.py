@@ -8,6 +8,7 @@ import psutil
 import pytz
 import ruamel.yaml as YAML
 import copy
+import os.path
 
 ##################################
 # Flask configuration:
@@ -36,6 +37,7 @@ global_sunrise = None
 global_sunset = None
 global_config = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0}
 lock = Lock()
+config_filename = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.yaml")
 
 ##################################
 # Helper functions:
@@ -77,13 +79,13 @@ def save_config():
         config = copy.deepcopy(global_config)
 
     # Write the values to a YAML file
-    with open('config.yaml', 'w') as file:
+    with open(config_filename, 'w') as file:
         yaml = YAML.YAML()
         yaml.dump(config, file)
 
 def load_config():
     ## Load the values from the YAML file
-    with open('config.yaml', 'r') as file:
+    with open(config_filename, 'r') as file:
         yaml = YAML.YAML()
         content = file.read()
         yaml_config = yaml.load(content)
