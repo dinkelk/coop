@@ -7,3 +7,4 @@ gevent-websocket
 psutil
 gpiozero
 astral
+ruamel.yaml

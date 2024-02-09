@@ -161,8 +161,8 @@
             document.getElementById('uptime').textContent = data.uptime;
             document.getElementById('sunrise').textContent = data.sunrise;
             document.getElementById('sunset').textContent = data.sunset;
-            document.getElementById('tu_sunrise').textContent = data.tu_sunrise;
-            document.getElementById('tu_sunset').textContent = data.tu_sunset;
+            document.getElementById('tu_open').textContent = data.tu_open;
+            document.getElementById('tu_close').textContent = data.tu_close;
         });
 
         function sendOpenCommand() {
@@ -182,6 +182,18 @@
             toggle.classList.toggle('on');
             var isOn = toggle.classList.contains('on');
             socket.emit('toggle', { toggle: isOn });
+        }
+
+        // Function to handle form submission
+        function handleSubmit(event) {
+            event.preventDefault();
+
+            // Get the values from the input boxes
+            const sunrise_offset = document.getElementById('sunrise_offset').value;
+            const sunset_offset = document.getElementById('sunset_offset').value;
+
+            // Send the values to the Flask app via WebSocket
+            socket.emit('auto_offsets', { sunrise_offset, sunset_offset });
         }
     </script>
 </head>
@@ -242,6 +254,17 @@
                 <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
                 <span class="toggle-label">Automatic Mode</span>
             </div>
+            <form onsubmit="handleSubmit(event)">
+                <label for="sunrise_offset">Open door at sunrise plus </label>
+                <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" value={{ sunrise_offset }} required>
+                <label> minutes.</label><br/>
+
+                <label for="sunset_offset">Close door at sunset plus </label>
+                <input type="number" id="sunset_offset" name="sunset_offset" step="1" value={{ sunset_offset }} required>
+                <label> minutes.</label><br/>
+
+                <button type="submit">Save</button>
+            </form>
             <table>
                 <tr>
                     <td><b>Sunrise</b></td>
@@ -253,11 +276,11 @@
                 </tr>
                 <tr>
                     <td><b>Door Opens in</b></td>
-                    <td><span id="tu_sunrise"></span></td>
+                    <td><span id="tu_open"></span></td>
                 </tr>
                 <tr>
                     <td><b>Door Closes in</b></td>
-                    <td><span id="tu_sunset"></span></td>
+                    <td><span id="tu_close"></span></td>
                 </tr>
             </table>
         </div>

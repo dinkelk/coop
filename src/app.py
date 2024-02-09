@@ -6,6 +6,8 @@ from gevent import monkey
 from datetime import datetime, date, timedelta
 import psutil
 import pytz
+import ruamel.yaml as YAML
+import copy
 
 ##################################
 # Flask configuration:
@@ -32,7 +34,7 @@ global_sunrise = None
 global_sunset = None
 global_sunrise = None
 global_sunset = None
-global_auto_mode = True
+global_config = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0}
 lock = Lock()
 
 ##################################
@@ -68,6 +70,26 @@ def get_sunrise_and_sunset():
 
     # Convert sunrise and sunset to the desired timezone (e.g., 'America/Denver')
     return s["sunrise"].astimezone(timezone), s["sunset"].astimezone(timezone)
+
+def save_config():
+    # Safely copy the global configuration into a local var
+    with lock:
+        config = copy.deepcopy(global_config)
+
+    # Write the values to a YAML file
+    with open('config.yaml', 'w') as file:
+        yaml = YAML.YAML()
+        yaml.dump(config, file)
+
+def load_config():
+    ## Load the values from the YAML file
+    with open('config.yaml', 'r') as file:
+        yaml = YAML.YAML()
+        content = file.read()
+        yaml_config = yaml.load(content)
+        if yaml_config:
+            with lock:
+                global_config.update(yaml_config)
 
 ##################################
 # Background tasks:
@@ -122,7 +144,7 @@ def door_task():
         door_override = door.get_override()
         with lock:
             d_door_state = global_desired_door_state
-            auto_mode = global_auto_mode
+            auto_mode = global_config["auto_mode"]
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
@@ -204,30 +226,32 @@ def data_update_task():
             cpu_temp = global_cpu_temp
             sunrise = global_sunrise
             sunset = global_sunset
-            auto_mode = global_auto_mode
+            auto_mode = global_config["auto_mode"]
+            sunrise_offset = int(global_config["sunrise_offset"])
+            sunset_offset = int(global_config["sunset_offset"])
 
         # Check if time until sunrise is positive
-        time_until_sunrise_str = None
-        time_until_sunset_str = None
+        time_until_open_str = None
+        time_until_close_str = None
         if auto_mode == False:
-            time_until_sunrise_str = "disabled"
-            time_until_sunset_str = "disabled"
+            time_until_open_str = "disabled"
+            time_until_close_str = "disabled"
         elif sunrise is not None and sunset is not None:
             # Assuming sunrise and sunset are datetime objects
             current_time = timezone.localize(datetime.now())
-            time_until_sunrise = sunrise - current_time
-            time_until_sunset = sunset - current_time
+            time_until_open = sunrise + timedelta(minutes=sunrise_offset) - current_time
+            time_until_close = sunset + timedelta(minutes=sunset_offset) - current_time
 
-            if time_until_sunrise > timedelta(0):
-                time_until_sunrise_str = (datetime.min + time_until_sunrise).strftime("%H:%M:%S")
+            if time_until_open > timedelta(0):
+                time_until_open_str = (datetime.min + time_until_open).strftime("%H:%M:%S")
             else:
-                time_until_sunrise_str = "passed"
+                time_until_open_str = "passed"
 
             # Check if time until sunset is positive
-            if time_until_sunset > timedelta(0):
-                time_until_sunset_str = (datetime.min + time_until_sunset).strftime("%H:%M:%S")
+            if time_until_close > timedelta(0):
+                time_until_close_str = (datetime.min + time_until_close).strftime("%H:%M:%S")
             else:
-                time_until_sunset_str = "passed"
+                time_until_close_str = "passed"
 
         to_send = {
           'temp_in': ("%0.1f" % temp_in) + u'\N{DEGREE SIGN}' + "F" if temp_in is not None else "",
@@ -240,8 +264,8 @@ def data_update_task():
           'uptime': str(get_uptime()),
           'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
           'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
-          'tu_sunrise': time_until_sunrise_str if time_until_sunrise_str is not None else "",
-          'tu_sunset': time_until_sunset_str if time_until_sunset_str is not None else ""
+          'tu_open': time_until_open_str if time_until_open_str is not None else "",
+          'tu_close': time_until_close_str if time_until_close_str is not None else ""
         }
         socketio.emit('data', to_send)
         time.sleep(1.0)
@@ -277,16 +301,26 @@ def handle_stop():
 
 @socketio.on('toggle')
 def handle_toggle(message):
-    global global_auto_mode
+    global global_config
     toggle_value = message['toggle']
     if toggle_value:
         print('Auto Mode Enabled')
         with lock:
-            global_auto_mode = True
+            global_config["auto_mode"] = True
     else:
         with lock:
-            global_auto_mode = False
+            global_config["auto_mode"] = False
         print('Auto Mode Disabled')
+    save_config()
+
+@socketio.on('auto_offsets')
+def handle_input_numbers(data):
+    global global_config
+    sunrise_offset = data['sunrise_offset']
+    sunset_offset = data['sunset_offset']
+    with lock:
+        global_config.update(data)
+    save_config()
 
 ##################################
 # Static page handlers:
@@ -296,13 +330,14 @@ def handle_toggle(message):
 @app.route('/')
 def index():
     with lock:
-        auto_mode = global_auto_mode
+        config = copy.deepcopy(global_config)
 
-    print("rendering with auto mode: " + str(auto_mode))
     # Render the template with temperature and humidity values
     return render_template(
         'index.html',
-        auto_mode=auto_mode
+        auto_mode=config["auto_mode"],
+        sunrise_offset=config["sunrise_offset"],
+        sunset_offset=config["sunset_offset"]
     )
 
 ##################################
@@ -310,6 +345,9 @@ def index():
 ##################################
 
 if __name__ == '__main__':
+    # Load global configuration file into memory
+    load_config()
+
     # Start the task that manages the door:
     thread = Thread(target=door_task)
     thread.daemon = True
