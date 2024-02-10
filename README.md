@@ -1,12 +1,12 @@
 # Dinky Coop
 *Those chickens won't open the door themselves.*
 
-This is the Raspberry Pi based controller software running my chicken coop. It currently exhibits the following capabilities:
+This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It currently exhibits the following capabilities:
 
-  1. Automatic open and closing of coop door based on sunrise and sunset time
-  2. Open and closing of the coop door via 3 position switch
+  1. Automatic open and closing of coop door based on sunrise and sunset time (and configurable offset)
+  2. Open and closing of the coop door via an external 3 position switch
   3. Temperature and humidity sensing inside and outside the coop
-  4. A simple web app to view the current temperature and humidity and control the door
+  4. A simple [Flask](https://flask.palletsprojects.com/en) web app using to view the current temperature and humidity and control the door
 
 ## How it is Wired Up
 
@@ -14,14 +14,24 @@ This is the Raspberry Pi based controller software running my chicken coop. It c
 
 ## How it is Run
 
+On your Raspberry Pi, run the following:
+
 ```
+$ git clone https://github.com/dinkelk/coop.git
+$ cd coop
 $ python3 -m venv venv
 $ source venv/bin/activate
+$ pip install --upgrade pip
 $ pip install -r requirements.txt
-# This is sometimes necessary to reset
-# CircuitPython after errors like 'Unable to set line 21 to input'.
+$ python3 src/app.py
+```
+
+Now access the webserver with a browser at http://127.0.0.1:5000.
+
+Sometimes it is necessary to reset CircuitPython after errors like 'Unable to set line 21 to input' by running:
+
+```
 $ killall libgpiod_pulsein64
-$ flask src/app.py
 ```
 
 ## TODO

@@ -8,3 +8,4 @@ psutil
 gpiozero
 astral
 ruamel.yaml
+pytz
