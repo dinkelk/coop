@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from threading import Thread, Lock
+from threading import Thread
 from flask_socketio import SocketIO
 from gevent import monkey
 from datetime import datetime, date, timedelta
@@ -13,7 +13,6 @@ import time
 import psutil
 import pytz
 import ruamel.yaml as YAML
-import copy
 import os.path
 import board
 
