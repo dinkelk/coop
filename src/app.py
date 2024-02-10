@@ -1,14 +1,21 @@
 from flask import Flask, render_template
 from threading import Thread, Lock
 from flask_socketio import SocketIO
-import time
 from gevent import monkey
 from datetime import datetime, date, timedelta
+from protected_dict import protected_dict as global_vars
+from astral import LocationInfo
+from astral.sun import sun
+from dht22 import DHT22
+from gpiozero import CPUTemperature
+from door import DOOR
+import time
 import psutil
 import pytz
 import ruamel.yaml as YAML
 import copy
 import os.path
+import board
 
 ##################################
 # Flask configuration:
@@ -18,26 +25,6 @@ monkey.patch_all()
 app = Flask(__name__, template_folder="../templates")
 app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app, async_mode='gevent')
-
-##################################
-# Shared global variables:
-##################################
-
-global_temp_in = None
-global_hum_in = None
-global_temp_out = None
-global_hum_out = None
-global_cpu_temp = None
-global_door_state = None
-global_door_override = False
-global_desired_door_state = "stopped"
-global_sunrise = None
-global_sunset = None
-global_sunrise = None
-global_sunset = None
-global_config = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0}
-lock = Lock()
-config_filename = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.yaml")
 
 ##################################
 # Helper functions:
@@ -59,9 +46,6 @@ def get_uptime():
     # Return system uptime string
     return f"{days} day(s), {hours} hour(s), {minutes} minute(s), {seconds} second(s)"
 
-from astral import LocationInfo
-from astral.sun import sun
-
 # Define the location of Boulder, Colorado
 boulder = LocationInfo("Boulder", "USA", "America/Denver", 40.01499, -105.27055)
 timezone = pytz.timezone('America/Denver')
@@ -73,35 +57,34 @@ def get_sunrise_and_sunset():
     # Convert sunrise and sunset to the desired timezone (e.g., 'America/Denver')
     return s["sunrise"].astimezone(timezone), s["sunset"].astimezone(timezone)
 
-def save_config():
-    # Safely copy the global configuration into a local var
-    with lock:
-        config = copy.deepcopy(global_config)
+config_filename = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.yaml")
 
+def save_config():
     # Write the values to a YAML file
     with open(config_filename, 'w') as file:
         yaml = YAML.YAML()
-        yaml.dump(config, file)
+        to_dump = {
+            "auto_mode" : global_vars.instance().get_value("auto_mode"),
+            "sunrise_offset" : global_vars.instance().get_value("sunrise_offset"),
+            "sunset_offset" : global_vars.instance().get_value("sunset_offset")
+        }
+        yaml.dump(to_dump, file)
 
 def load_config():
     ## Load the values from the YAML file
+    config_to_set = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0}
     with open(config_filename, 'r') as file:
         yaml = YAML.YAML()
         content = file.read()
         yaml_config = yaml.load(content)
-        if yaml_config:
-            with lock:
-                global_config.update(yaml_config)
+        config_to_set.update(yaml_config)
+        global_vars.instance().set_values(config_to_set)
 
 ##################################
 # Background tasks:
 ##################################
 
 def temperature_task():
-    import board
-    from dht22 import DHT22
-    from gpiozero import CPUTemperature
-    global global_temp_in, global_hum_in, global_temp_out, global_hum_out, global_cpu_temp
     dht_out = DHT22(board.D21)
     dht_in = DHT22(board.D20)
     while True:
@@ -114,29 +97,22 @@ def temperature_task():
 
         # Set global temperature and humidity:
         if temp_in is not None:
-            with lock:
-                global_temp_in = temp_in
+            global_vars.instance().set_value("temp_in", temp_in)
         if temp_out is not None:
-            with lock:
-                global_temp_out = temp_out
+            global_vars.instance().set_value("temp_out", temp_out)
         if hum_in is not None:
-            with lock:
-                global_hum_in = hum_in
+            global_vars.instance().set_value("hum_in", hum_in)
         if hum_out is not None:
-            with lock:
-                global_hum_out = hum_out
+            global_vars.instance().set_value("hum_out", hum_out)
 
+        # Set CPU temperature:
         cpu_temp = CPUTemperature().temperature
-        with lock:
-            global_cpu_temp = cpu_temp
+        global_vars.instance().set_value("cpu_temp", cpu_temp)
 
         time.sleep(1.0)
 
 # Background thread for managing coop door in real-time.
 def door_task():
-    from door import DOOR
-    global global_door_state, global_desired_door_state, global_door_override, global_sunrise, global_sunset
-
     door = DOOR()
     door_move_count = 0
     DOOR_MOVE_MAX = 35
@@ -144,9 +120,8 @@ def door_task():
         # Get state and desired state:
         door_state = door.get_state()
         door_override = door.get_override()
-        with lock:
-            d_door_state = global_desired_door_state
-            auto_mode = global_config["auto_mode"]
+        d_door_state, auto_mode = \
+            global_vars.instance().get_values(["desired_door_state", "auto_mode"])
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
@@ -159,12 +134,12 @@ def door_task():
             # If we are in the 1 minute after sunrise, command the desired door
             # state to open.
             if current_time > sunrise and current_time < sunrise + time_window:
-                global_desired_door_state = "open"
+                global_vars.instance().set_value("desired_door_state", "open")
 
             # If we are in the 1 minute after sunset, command the desired door
             # state to closed.
             if current_time > sunset and current_time < sunset + time_window:
-                global_desired_door_state = "closed"
+                global_vars.instance().set_value("desired_door_state", "closed")
 
         # Handle door:
         if door_override:
@@ -172,8 +147,7 @@ def door_task():
             # when override switch is no longer being used,
             # we don't move the motor until a new button is
             # pressed.
-            with lock:
-                global_desired_door_state = "stopped"
+            global_vars.instance().set_value("desired_door_state", "stopped")
         elif door_state != d_door_state:
             match d_door_state:
                 case "stopped":
@@ -208,29 +182,22 @@ def door_task():
         # Set global state
         door_state = door.get_state()
         door_override = door.get_override()
-        with lock:
-            global_door_state = door_state
-            global_door_override = door_override
-            global_sunrise = sunrise
-            global_sunset = sunset
-
+        global_vars.instance().set_values({ \
+            "state": door_state, \
+            "door_override": door_override, \
+            "sunrise": sunrise, \
+            "sunset": sunset \
+        })
         time.sleep(1.0)
 
 def data_update_task():
     while True:
-        with lock:
-            temp_in = global_temp_in
-            hum_in = global_hum_in
-            temp_out = global_temp_out
-            hum_out = global_hum_out
-            state = global_door_state
-            override = global_door_override
-            cpu_temp = global_cpu_temp
-            sunrise = global_sunrise
-            sunset = global_sunset
-            auto_mode = global_config["auto_mode"]
-            sunrise_offset = int(global_config["sunrise_offset"])
-            sunset_offset = int(global_config["sunset_offset"])
+        temp_in, hum_in, temp_out, hum_out, state, override, cpu_temp, \
+            sunrise, sunset, auto_mode, sunrise_offset, sunset_offset = \
+            global_vars.instance().get_values(["temp_in", "hum_in", \
+                "temp_out", "hum_out", "state", "override", "cpu_temp", \
+                "sunrise", "sunset", "auto_mode", "sunrise_offset", \
+                "sunset_offset"])
 
         # Check if time until sunrise is positive
         time_until_open_str = None
@@ -283,45 +250,34 @@ def handle_connect():
 @socketio.on('open')
 def handle_open():
     print('Open button pressed')
-    global global_desired_door_state
-    with lock:
-        global_desired_door_state = "open"
+    global_vars.instance().set_value("desired_door_state", "open")
 
 @socketio.on('close')
 def handle_close():
     print('Close button pressed')
-    global global_desired_door_state
-    with lock:
-        global_desired_door_state = "closed"
+    global_vars.instance().set_value("desired_door_state", "closed")
 
 @socketio.on('stop')
 def handle_stop():
     print('Stop button pressed')
-    global global_desired_door_state
-    with lock:
-        global_desired_door_state = "stopped"
+    global_vars.instance().set_value("desired_door_state", "stopped")
 
 @socketio.on('toggle')
 def handle_toggle(message):
-    global global_config
     toggle_value = message['toggle']
     if toggle_value:
         print('Auto Mode Enabled')
-        with lock:
-            global_config["auto_mode"] = True
+        global_vars.instance().set_value("auto_mode", True)
     else:
-        with lock:
-            global_config["auto_mode"] = False
+        global_vars.instance().set_value("auto_mode", False)
         print('Auto Mode Disabled')
     save_config()
 
 @socketio.on('auto_offsets')
 def handle_input_numbers(data):
-    global global_config
     sunrise_offset = data['sunrise_offset']
     sunset_offset = data['sunset_offset']
-    with lock:
-        global_config.update(data)
+    global_vars.instance().set_values({"sunrise_offset": int(sunrise_offset), "sunset_offset": int(sunset_offset)})
     save_config()
 
 ##################################
@@ -331,15 +287,12 @@ def handle_input_numbers(data):
 # Route for the home page
 @app.route('/')
 def index():
-    with lock:
-        config = copy.deepcopy(global_config)
-
     # Render the template with temperature and humidity values
     return render_template(
         'index.html',
-        auto_mode=config["auto_mode"],
-        sunrise_offset=config["sunrise_offset"],
-        sunset_offset=config["sunset_offset"]
+        auto_mode=global_vars.instance().get_value("auto_mode"),
+        sunrise_offset=global_vars.instance().get_value("sunrise_offset"),
+        sunset_offset=global_vars.instance().get_value("sunset_offset")
     )
 
 ##################################
@@ -347,18 +300,21 @@ def index():
 ##################################
 
 if __name__ == '__main__':
+    # Initialize the desired door state:
+    global_vars.instance().set_value("desired_door_state", "stopped")
+
     # Load global configuration file into memory
     load_config()
 
     # Start the task that manages the door:
-    thread = Thread(target=door_task)
-    thread.daemon = True
-    thread.start()
+    door_thread = Thread(target=door_task)
+    door_thread.daemon = True
+    door_thread.start()
 
     # Start the task that grabs temperature data:
-    thread2 = Thread(target=temperature_task)
-    thread2.daemon = True
-    thread2.start()
+    temp_thread = Thread(target=temperature_task)
+    temp_thread.daemon = True
+    temp_thread.start()
 
     # Start the Flask app
     socketio.run(app, debug=False, host='0.0.0.0')
