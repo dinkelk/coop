@@ -4,6 +4,11 @@
     <title>Dinky Coop</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        .title {
+            padding: 15px 0px 0px 11px;
+            color: #222222;
+        }
+
         .container {
             max-width: 600px;
             margin: 0 auto;
@@ -17,20 +22,21 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 800px) {
             .container {
                 padding: 0;
             }
         }
 
         .toggle-container {
+            padding: 0px;
             display: flex;
             align-items: center;
         }
 
         .toggle {
-            width: 100px;
-            height: 50px;
+            width: 50px;
+            height: 25px;
             background-color: #aaa;
             border-radius: 25px;
             position: relative;
@@ -40,10 +46,10 @@
         .toggle:before {
             content: "";
             position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 46px;
-            height: 46px;
+            top: 1px;
+            left: 1px;
+            width: 23px;
+            height: 23px;
             background-color: #fff;
             border-radius: 50%;
             transition: transform 0.3s ease;
@@ -54,12 +60,20 @@
         }
 
         .toggle.on:before {
-            transform: translateX(50px);
+            transform: translateX(25px);
         }
 
         .toggle-label {
             margin-left: 10px;
             font-size: 20px;
+        }
+
+        .auto_info {
+          display: none;
+        }
+
+        .auto_info.on {
+          display: block;
         }
 
         body {
@@ -92,6 +106,7 @@
             padding: 15px;
             text-align: left;
             border-bottom: 1px solid #ddd;
+            color: #444444;
         }
 
         th {
@@ -106,7 +121,7 @@
         .button-container {
             display: flex;
             justify-content: center;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
         .button {
@@ -182,6 +197,12 @@
             toggle.classList.toggle('on');
             var isOn = toggle.classList.contains('on');
             socket.emit('toggle', { toggle: isOn });
+            var container = document.getElementById('auto_info');
+            if(isOn) {
+                container.style.display = "block";
+            } else {
+                container.style.display = "none";
+            }
         }
 
         // Function to handle form submission
@@ -201,7 +222,7 @@
     <div class="container">
         <div class="content">
             <h1>Dinky Coop</h1>
-            <h3>System</h3>
+            <h3 class="title">System</h3>
             <table>
                 <tr>
                     <td><b>Uptime</b></td>
@@ -212,7 +233,7 @@
                     <td><span id="cpu_temp"></span></td>
                 </tr>
             </table>
-            <h3>Outside</h3>
+            <h3 class="title">Outside</h3>
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
@@ -223,7 +244,7 @@
                     <td><span id="hum_out"></span></td>
                 </tr>
             </table>
-            <h3>Inside</h3>
+            <h3 class="title">Inside</h3>
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
@@ -234,13 +255,17 @@
                     <td><span id="hum_in"></span></td>
                 </tr>
             </table>
-            <h3>Door Control</h3>
-            <div class="button-container">
-                <button class="button close" onclick="sendCloseCommand()">Close</button>
-                <button class="button stop" onclick="sendStopCommand()">Stop</button>
-                <button class="button open" onclick="sendOpenCommand()">Open</button>
-            </div>
+            <h3 class="title">Door Control</h3>
             <table>
+                <tr>
+                    <td colspan="2">
+                      <div class="button-container" style="margin-top: 0px;">
+                          <button class="button close" onclick="sendCloseCommand()">Close</button>
+                          <button class="button stop" onclick="sendStopCommand()">Stop</button>
+                          <button class="button open" onclick="sendOpenCommand()">Open</button>
+                      </div>
+                    </td>
+                </tr>
                 <tr>
                     <td><b>Door Position</b></td>
                     <td><span id="state"></span></td>
@@ -250,22 +275,30 @@
                     <td><span id="override"></span></td>
                 </tr>
             </table>
-            <div class="toggle-container">
+            <div class="toggle-container" style="margin-bottom: 0px;">
+                <h3 class="title" style="margin-right: 20px; margin-top: 10px;">Auto Mode</h3>
                 <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
-                <span class="toggle-label">Automatic Mode</span>
             </div>
-            <form onsubmit="handleSubmit(event)">
-                <label for="sunrise_offset">Open door at sunrise plus </label>
-                <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" value={{ sunrise_offset }} required>
-                <label> minutes.</label><br/>
+            <div id="auto_info" class="auto_info {% if auto_mode %} on{% endif %}">
+            <table style="margin-top: 0px;">
+                <tr>
+                    <td colspan="2">
+                        <form onsubmit="handleSubmit(event)">
+                            <label for="sunrise_offset">Open door at sunrise plus </label>
+                            <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunrise_offset }} required>
+                            <label> minutes.</label><br/>
 
-                <label for="sunset_offset">Close door at sunset plus </label>
-                <input type="number" id="sunset_offset" name="sunset_offset" step="1" value={{ sunset_offset }} required>
-                <label> minutes.</label><br/>
+                            <label for="sunset_offset">Close door at sunset plus </label>
+                            <input type="number" id="sunset_offset" name="sunset_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunset_offset }} required>
+                            <label> minutes.</label><br/>
 
-                <button type="submit">Save</button>
-            </form>
-            <table>
+
+                            <div class="button-container">
+                                <button class="button close" type="submit">Save</button>
+                            </div>
+                        </form>
+
+                </td>
                 <tr>
                     <td><b>Sunrise</b></td>
                     <td><span id="sunrise"></span></td>
@@ -283,6 +316,7 @@
                     <td><span id="tu_close"></span></td>
                 </tr>
             </table>
+            </div>
         </div>
     </div>
 </body>
