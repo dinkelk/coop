@@ -1,3 +1,3 @@
 auto_mode: true
-sunrise_offset: '0'
-sunset_offset: '0'
+sunrise_offset: 0
+sunset_offset: 0
