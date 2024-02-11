@@ -40,4 +40,3 @@ $ killall libgpiod_pulsein64
   2. Show daily max and min temperature and humidity (min (blue), current (black), max (orange))
   3. Show temp/humidity plot of last 36 hours
   4. Make webpage look nicer, photos, animations, icons
-  5. Open or close door at startup based on current time and sunrise/sunset times

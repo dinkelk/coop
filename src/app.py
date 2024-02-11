@@ -114,7 +114,8 @@ def temperature_task():
 def door_task():
     door = DOOR()
     door_move_count = 0
-    DOOR_MOVE_MAX = 35
+    DOOR_MOVE_MAX = 35 # seconds
+    first_iter = True
     while True:
         # Get state and desired state:
         door_state = door.get_state()
@@ -125,19 +126,31 @@ def door_task():
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
         if auto_mode:
-            # Get the current sunrise and sunset time:
+            # Get the current sunrise and sunset time, time of close, time of open, and current time.
             sunrise, sunset = get_sunrise_and_sunset()
+            sunrise_offset, sunset_offset = global_vars.instance().get_values(["sunrise_offset", "sunset_offset"])
+            open_time = sunrise + timedelta(minutes=sunrise_offset)
+            close_time = sunset + timedelta(minutes=sunset_offset)
             current_time = timezone.localize(datetime.now())
             time_window = timedelta(minutes=1)
 
+            # If we just booted up, then we need to make sure the door is in the
+            # correct position. This prevents the door from being stuck in the wrong
+            # position due to an unfortunately timed power outage.
+            if first_iter:
+                if current_time >= open_time and current_time < close_time:
+                    global_vars.instance().set_value("desired_door_state", "open")
+                else:
+                    global_vars.instance().set_value("desired_door_state", "close")
+
             # If we are in the 1 minute after sunrise, command the desired door
             # state to open.
-            if current_time > sunrise and current_time < sunrise + time_window:
+            if current_time >= open_time and current_time <= open_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "open")
 
             # If we are in the 1 minute after sunset, command the desired door
             # state to closed.
-            if current_time > sunset and current_time < sunset + time_window:
+            if current_time >= close_time and current_time <= close_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "closed")
 
         # Handle door:
@@ -179,6 +192,7 @@ def door_task():
             door_move_count = 0
 
         # Set global state
+        first_iter = False
         door_state = door.get_state()
         door_override = door.get_override()
         global_vars.instance().set_values({ \
