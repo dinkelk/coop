@@ -167,10 +167,20 @@
         socket.on('data', function(data) {
             console.log('Received data:', data);
             document.getElementById('temp_in').textContent = data.temp_in;
+            document.getElementById('temp_in_min').textContent = data.temp_in_min;
+            document.getElementById('temp_in_max').textContent = data.temp_in_max;
             document.getElementById('hum_in').textContent = data.hum_in;
+            document.getElementById('hum_in_min').textContent = data.hum_in_min;
+            document.getElementById('hum_in_max').textContent = data.hum_in_max;
             document.getElementById('temp_out').textContent = data.temp_out;
+            document.getElementById('temp_out_min').textContent = data.temp_out_min;
+            document.getElementById('temp_out_max').textContent = data.temp_out_max;
             document.getElementById('hum_out').textContent = data.hum_out;
+            document.getElementById('hum_out_min').textContent = data.hum_out_min;
+            document.getElementById('hum_out_max').textContent = data.hum_out_max;
             document.getElementById('cpu_temp').textContent = data.cpu_temp;
+            document.getElementById('cpu_temp_min').textContent = data.cpu_temp_min;
+            document.getElementById('cpu_temp_max').textContent = data.cpu_temp_max;
             document.getElementById('state').textContent = data.state;
             document.getElementById('override').textContent = data.override;
             document.getElementById('uptime').textContent = data.uptime;
@@ -226,33 +236,43 @@
             <table>
                 <tr>
                     <td><b>Uptime</b></td>
-                    <td><span id="uptime"></span></td>
+                    <td colspan="3"><span id="uptime"></span></td>
                 </tr>
                 <tr>
                     <td><b>CPU Temperature</b></td>
-                    <td><span id="cpu_temp"></span></td>
+                    <td><span id="cpu_temp_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="cpu_temp" style="font-weight: bold;"></span></td>
+                    <td><span id="cpu_temp_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
             <h3 class="title">Outside</h3>
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
-                    <td><span id="temp_out"></span></td>
+                    <td><span id="temp_out_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="temp_out" style="font-weight: bold;"></span></td>
+                    <td><span id="temp_out_max" style="color: #ff8c00;"></span></td>
                 </tr>
                 <tr>
                     <td><b>Humidity</b></td>
-                    <td><span id="hum_out"></span></td>
+                    <td><span id="hum_out_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="hum_out" style="font-weight: bold;"></span></td>
+                    <td><span id="hum_out_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
             <h3 class="title">Inside</h3>
             <table>
                 <tr>
                     <td><b>Temperature</b></td>
-                    <td><span id="temp_in"></span></td>
+                    <td><span id="temp_in_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="temp_in" style="font-weight: bold;"></span></td>
+                    <td><span id="temp_in_max" style="color: #ff8c00;"></span></td>
                 </tr>
                 <tr>
                     <td><b>Humidity</b></td>
-                    <td><span id="hum_in"></span></td>
+                    <td><span id="hum_in_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="hum_in" style="font-weight: bold;"></span></td>
+                    <td><span id="hum_in_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
             <h3 class="title">Door Control</h3>

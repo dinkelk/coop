@@ -56,6 +56,9 @@ def get_sunrise_and_sunset():
     # Convert sunrise and sunset to the desired timezone (e.g., 'America/Denver')
     return s["sunrise"].astimezone(timezone), s["sunset"].astimezone(timezone)
 
+def get_current_time():
+    return timezone.localize(datetime.now())
+
 config_filename = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.yaml")
 
 def save_config():
@@ -86,27 +89,50 @@ def load_config():
 def temperature_task():
     dht_out = DHT22(board.D21)
     dht_in = DHT22(board.D20)
+    last_date = None
+
+    # Update value in global vars, and also store min and max seen since startup:
+    def update_val(val, name):
+        if val is not None:
+            val_max, val_min = global_vars.instance().get_values([name + "_max", name + "_min"])
+            val_max = val_max if val_max is not None else -500
+            val_min = val_min if val_min is not None else 500
+            if val > val_max:
+                val_max = val
+            if val < val_min:
+                val_min = val
+            global_vars.instance().set_values({name: val, name + "_max": val_max, name + "_min": val_min})
+
     while True:
         temp_out, hum_out = dht_out.get_temperature_and_humidity()
         temp_in, hum_in = dht_in.get_temperature_and_humidity()
+
         if temp_out is not None and hum_out is not None:
             print("Outside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_out, hum_out))
         if temp_in is not None and hum_in is not None:
             print("Inside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_in, hum_in))
 
-        # Set global temperature and humidity:
-        if temp_in is not None:
-            global_vars.instance().set_value("temp_in", temp_in)
-        if temp_out is not None:
-            global_vars.instance().set_value("temp_out", temp_out)
-        if hum_in is not None:
-            global_vars.instance().set_value("hum_in", hum_in)
-        if hum_out is not None:
-            global_vars.instance().set_value("hum_out", hum_out)
+        # If it is midnight then reset the mins and maxes so we get fresh values for the new day:
+        current_date = date.today()
+        if current_date != last_date:
+            global_vars.instance().set_values({ \
+                "temp_in_min": 500, "temp_in_max": -500, \
+                "temp_out_min": 500, "temp_out_max": -500, \
+                "hum_in_min": 500, "hum_in_max": -500, \
+                "hum_out_min": 500, "hum_out_max": -500, \
+                "cpu_temp_min": 500, "cpu_temp_max": -500 \
+            })
+            last_date = current_date
+
+        # Update the global variables for all the temperatures:
+        update_val(temp_in, "temp_in")
+        update_val(hum_in, "hum_in")
+        update_val(temp_out, "temp_out")
+        update_val(hum_out, "hum_out")
 
         # Set CPU temperature:
         cpu_temp = CPUTemperature().temperature
-        global_vars.instance().set_value("cpu_temp", cpu_temp)
+        update_val(cpu_temp, "cpu_temp")
 
         time.sleep(1.0)
 
@@ -131,7 +157,7 @@ def door_task():
             sunrise_offset, sunset_offset = global_vars.instance().get_values(["sunrise_offset", "sunset_offset"])
             open_time = sunrise + timedelta(minutes=sunrise_offset)
             close_time = sunset + timedelta(minutes=sunset_offset)
-            current_time = timezone.localize(datetime.now())
+            current_time = get_current_time()
             time_window = timedelta(minutes=1)
 
             # If we just booted up, then we need to make sure the door is in the
@@ -206,11 +232,16 @@ def door_task():
 def data_update_task():
     while True:
         temp_in, hum_in, temp_out, hum_out, state, override, cpu_temp, \
-            sunrise, sunset, auto_mode, sunrise_offset, sunset_offset = \
-            global_vars.instance().get_values(["temp_in", "hum_in", \
+            sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
+            temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
+            temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
+            cpu_temp_min, cpu_temp_max \
+            = global_vars.instance().get_values(["temp_in", "hum_in", \
                 "temp_out", "hum_out", "state", "override", "cpu_temp", \
-                "sunrise", "sunset", "auto_mode", "sunrise_offset", \
-                "sunset_offset"])
+                "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
+                "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
+                "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
+                "cpu_temp_min", "cpu_temp_max"])
 
         # Check if time until sunrise is positive
         time_until_open_str = None
@@ -220,7 +251,7 @@ def data_update_task():
             time_until_close_str = "disabled"
         elif sunrise is not None and sunset is not None:
             # Assuming sunrise and sunset are datetime objects
-            current_time = timezone.localize(datetime.now())
+            current_time = get_current_time()
             time_until_open = sunrise + timedelta(minutes=sunrise_offset) - current_time
             time_until_close = sunset + timedelta(minutes=sunset_offset) - current_time
 
@@ -235,12 +266,28 @@ def data_update_task():
             else:
                 time_until_close_str = "passed"
 
+        def format_temp(temp, units="F"):
+            return ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + units if temp is not None else ""
+
+        def format_hum(hum):
+            return "%0.1f%%" % hum if hum is not None else ""
+
         to_send = {
-          'temp_in': ("%0.1f" % temp_in) + u'\N{DEGREE SIGN}' + "F" if temp_in is not None else "",
-          'hum_in': "%0.1f%%" % hum_in if hum_in is not None else "",
-          'temp_out': ("%0.1f" % temp_out) + u'\N{DEGREE SIGN}' + "F" if temp_out is not None else "",
-          'hum_out': "%0.1f%%" % hum_out if hum_out is not None else "",
-          'cpu_temp': ("%0.1f" % cpu_temp ) + u'\N{DEGREE SIGN}' + "C" if cpu_temp is not None else "",
+          'temp_in': format_temp(temp_in),
+          'temp_in_min': format_temp(temp_in_min),
+          'temp_in_max': format_temp(temp_in_max),
+          'hum_in': format_hum(hum_in),
+          'hum_in_min': format_hum(hum_in_min),
+          'hum_in_max': format_hum(hum_in_max),
+          'temp_out': format_temp(temp_out),
+          'temp_out_min': format_temp(temp_out_min),
+          'temp_out_max': format_temp(temp_out_max),
+          'hum_out': format_hum(hum_out),
+          'hum_out_min': format_hum(hum_out_min),
+          'hum_out_max': format_hum(hum_out_max),
+          'cpu_temp': format_temp(cpu_temp, units="C"),
+          'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
+          'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
           'state': state if state is not None else "",
           'override': state if override else "off",
           'uptime': str(get_uptime()),

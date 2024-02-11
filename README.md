@@ -37,6 +37,5 @@ $ killall libgpiod_pulsein64
 ## TODO
 
   1. Log data to file, one file per day
-  2. Show daily max and min temperature and humidity (min (blue), current (black), max (orange))
-  3. Show temp/humidity plot of last 36 hours
-  4. Make webpage look nicer, photos, animations, icons
+  2. Show temp/humidity plot of last 36 hours
+  3. Make webpage look nicer, photos, animations, icons
