@@ -10,6 +10,8 @@ This is the [Raspberry Pi](https://www.raspberrypi.com) based controller softwar
 
 ## How it is Wired Up
 
+This is how things are connected, drawn using [Fritzing](https://fritzing.org/).
+
  ![`Coop Wiring Diagram`](img/coop_bb.svg "coop_bb.svg")
 
 ## How it is Run
