@@ -167,7 +167,7 @@ def door_task():
                 if current_time >= open_time and current_time < close_time:
                     global_vars.instance().set_value("desired_door_state", "open")
                 else:
-                    global_vars.instance().set_value("desired_door_state", "close")
+                    global_vars.instance().set_value("desired_door_state", "closed")
 
             # If we are in the 1 minute after sunrise, command the desired door
             # state to open.
