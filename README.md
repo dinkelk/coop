@@ -36,7 +36,15 @@ Sometimes it is necessary to reset CircuitPython after errors like 'Unable to se
 $ killall libgpiod_pulsein64
 ```
 
-## TODO
+## Run Automatically at Startup
+
+To start the controller automatically at boot, run `crontab -e` and append the following entry:
+
+```
+@reboot /home/pi/coop/cron_script.sh
+```
+
+## Future Improvements
 
   1. Log data to file, one file per day
   2. Show temp/humidity plot of last 36 hours
