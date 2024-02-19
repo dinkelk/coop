@@ -99,11 +99,11 @@
         }
 
         td:first-child {
-            width: 30%;
+            width: 35%;
         }
 
         th, td {
-            padding: 15px;
+            padding: 15px 10px;
             text-align: left;
             border-bottom: 1px solid #ddd;
             color: #444444;
@@ -164,6 +164,8 @@
     <script>
         var socket = io();
 
+        let current_state = ""
+
         socket.on('data', function(data) {
             console.log('Received data:', data);
             document.getElementById('temp_in').textContent = data.temp_in;
@@ -181,13 +183,17 @@
             document.getElementById('cpu_temp').textContent = data.cpu_temp;
             document.getElementById('cpu_temp_min').textContent = data.cpu_temp_min;
             document.getElementById('cpu_temp_max').textContent = data.cpu_temp_max;
-            document.getElementById('state').textContent = data.state;
             document.getElementById('override').textContent = data.override;
             document.getElementById('uptime').textContent = data.uptime;
             document.getElementById('sunrise').textContent = data.sunrise;
             document.getElementById('sunset').textContent = data.sunset;
             document.getElementById('tu_open').textContent = data.tu_open;
             document.getElementById('tu_close').textContent = data.tu_close;
+            if (current_state !== data.state) {
+                // document.getElementById('state').textContent = data.state;
+              document.getElementById('state').innerHTML = `<center><img src="static/${data.state}.png" alt="${data.state}" width="90px"><br>${data.state}</center>`;
+                current_state = data.state;
+            }
         });
 
         function sendOpenCommand() {
@@ -278,6 +284,9 @@
             <h3 class="title">Door Control</h3>
             <table>
                 <tr>
+                    <td colspan="2"><span id="state"></span></td>
+                </tr>
+                <tr>
                     <td colspan="2">
                       <div class="button-container" style="margin-top: 0px;">
                           <button class="button close" onclick="sendCloseCommand()">Close</button>
@@ -285,10 +294,6 @@
                           <button class="button open" onclick="sendOpenCommand()">Open</button>
                       </div>
                     </td>
-                </tr>
-                <tr>
-                    <td><b>Door Position</b></td>
-                    <td><span id="state"></span></td>
                 </tr>
                 <tr>
                     <td><b>Switch Position</b></td>
