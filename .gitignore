@@ -12,3 +12,4 @@ instance/
 
 # Environments
 venv/
+.DS_Store
