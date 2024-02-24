@@ -266,7 +266,8 @@ def door_task():
                     else:
                         door.stop()
                         door_move_count = 0
-                case "open": if door_move_count <= DOOR_MOVE_MAX:
+                case "open":
+                    if door_move_count <= DOOR_MOVE_MAX:
                         door.open()
                         door_move_count += 1
                     else:
