@@ -7,6 +7,7 @@ This is the [Raspberry Pi](https://www.raspberrypi.com) based controller softwar
   2. Open and closing of the coop door via an external 3 position switch
   3. Temperature and humidity sensing inside and outside the coop
   4. A simple [Flask](https://flask.palletsprojects.com/en) web app using to view the current temperature and humidity and control the door
+  5. Logging of all data to CSV files
 
 ## How it is Wired Up
 
@@ -46,6 +47,5 @@ To start the controller automatically at boot, run `crontab -e` and append the f
 
 ## Future Improvements
 
-  1. Log data to file, one file per day
-  2. Show temp/humidity plot of last 36 hours
-  3. Make webpage look nicer, photos, animations, icons
+  1. Show temp/humidity plot of last 36 hours
+  2. Make webpage look nicer, photos, animations, icons

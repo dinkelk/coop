@@ -1,6 +1,9 @@
 # Don't commit changes to configuration file by default
 config.yaml
 
+# Ignore log dir:
+log/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

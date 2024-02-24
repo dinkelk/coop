@@ -59,7 +59,8 @@ def get_sunrise_and_sunset():
 def get_current_time():
     return timezone.localize(datetime.now())
 
-config_filename = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.yaml")
+root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+config_filename = os.path.join(root_path, "config.yaml")
 
 def save_config():
     # Write the values to a YAML file
@@ -81,6 +82,76 @@ def load_config():
         yaml_config = yaml.load(content)
         config_to_set.update(yaml_config)
         global_vars.instance().set_values(config_to_set)
+
+def get_all_data():
+    # Grab data safely from global store:
+    temp_in, hum_in, temp_out, hum_out, state, override, cpu_temp, \
+        sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
+        temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
+        temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
+        cpu_temp_min, cpu_temp_max \
+        = global_vars.instance().get_values(["temp_in", "hum_in", \
+            "temp_out", "hum_out", "state", "override", "cpu_temp", \
+            "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
+            "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
+            "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
+            "cpu_temp_min", "cpu_temp_max"])
+
+    # Check if time until sunrise is positive
+    time_until_open_str = None
+    time_until_close_str = None
+    if auto_mode == False:
+        time_until_open_str = "disabled"
+        time_until_close_str = "disabled"
+    elif sunrise is not None and sunset is not None:
+        # Assuming sunrise and sunset are datetime objects
+        current_time = get_current_time()
+        time_until_open = sunrise + timedelta(minutes=sunrise_offset) - current_time
+        time_until_close = sunset + timedelta(minutes=sunset_offset) - current_time
+
+        if time_until_open > timedelta(0):
+            time_until_open_str = (datetime.min + time_until_open).strftime("%H:%M:%S")
+        else:
+            time_until_open_str = "passed"
+
+        # Check if time until sunset is positive
+        if time_until_close > timedelta(0):
+            time_until_close_str = (datetime.min + time_until_close).strftime("%H:%M:%S")
+        else:
+            time_until_close_str = "passed"
+
+    def format_temp(temp, units="F"):
+        return ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + units if temp is not None else ""
+
+    def format_hum(hum):
+        return "%0.1f%%" % hum if hum is not None else ""
+
+    # Return nicely formatted data in dictionary form:
+    data_dict = {
+      'temp_in': format_temp(temp_in),
+      'temp_in_min': format_temp(temp_in_min),
+      'temp_in_max': format_temp(temp_in_max),
+      'hum_in': format_hum(hum_in),
+      'hum_in_min': format_hum(hum_in_min),
+      'hum_in_max': format_hum(hum_in_max),
+      'temp_out': format_temp(temp_out),
+      'temp_out_min': format_temp(temp_out_min),
+      'temp_out_max': format_temp(temp_out_max),
+      'hum_out': format_hum(hum_out),
+      'hum_out_min': format_hum(hum_out_min),
+      'hum_out_max': format_hum(hum_out_max),
+      'cpu_temp': format_temp(cpu_temp, units="C"),
+      'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
+      'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
+      'state': state if state is not None else "",
+      'override': state if override else "off",
+      'uptime': str(get_uptime()),
+      'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
+      'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
+      'tu_open': time_until_open_str if time_until_open_str is not None else "",
+      'tu_close': time_until_close_str if time_until_close_str is not None else ""
+    }
+    return data_dict
 
 ##################################
 # Background tasks:
@@ -195,8 +266,7 @@ def door_task():
                     else:
                         door.stop()
                         door_move_count = 0
-                case "open":
-                    if door_move_count <= DOOR_MOVE_MAX:
+                case "open": if door_move_count <= DOOR_MOVE_MAX:
                         door.open()
                         door_move_count += 1
                     else:
@@ -231,73 +301,40 @@ def door_task():
 
 def data_update_task():
     while True:
-        temp_in, hum_in, temp_out, hum_out, state, override, cpu_temp, \
-            sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
-            temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
-            temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
-            cpu_temp_min, cpu_temp_max \
-            = global_vars.instance().get_values(["temp_in", "hum_in", \
-                "temp_out", "hum_out", "state", "override", "cpu_temp", \
-                "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
-                "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
-                "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
-                "cpu_temp_min", "cpu_temp_max"])
-
-        # Check if time until sunrise is positive
-        time_until_open_str = None
-        time_until_close_str = None
-        if auto_mode == False:
-            time_until_open_str = "disabled"
-            time_until_close_str = "disabled"
-        elif sunrise is not None and sunset is not None:
-            # Assuming sunrise and sunset are datetime objects
-            current_time = get_current_time()
-            time_until_open = sunrise + timedelta(minutes=sunrise_offset) - current_time
-            time_until_close = sunset + timedelta(minutes=sunset_offset) - current_time
-
-            if time_until_open > timedelta(0):
-                time_until_open_str = (datetime.min + time_until_open).strftime("%H:%M:%S")
-            else:
-                time_until_open_str = "passed"
-
-            # Check if time until sunset is positive
-            if time_until_close > timedelta(0):
-                time_until_close_str = (datetime.min + time_until_close).strftime("%H:%M:%S")
-            else:
-                time_until_close_str = "passed"
-
-        def format_temp(temp, units="F"):
-            return ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + units if temp is not None else ""
-
-        def format_hum(hum):
-            return "%0.1f%%" % hum if hum is not None else ""
-
-        to_send = {
-          'temp_in': format_temp(temp_in),
-          'temp_in_min': format_temp(temp_in_min),
-          'temp_in_max': format_temp(temp_in_max),
-          'hum_in': format_hum(hum_in),
-          'hum_in_min': format_hum(hum_in_min),
-          'hum_in_max': format_hum(hum_in_max),
-          'temp_out': format_temp(temp_out),
-          'temp_out_min': format_temp(temp_out_min),
-          'temp_out_max': format_temp(temp_out_max),
-          'hum_out': format_hum(hum_out),
-          'hum_out_min': format_hum(hum_out_min),
-          'hum_out_max': format_hum(hum_out_max),
-          'cpu_temp': format_temp(cpu_temp, units="C"),
-          'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
-          'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
-          'state': state if state is not None else "",
-          'override': state if override else "off",
-          'uptime': str(get_uptime()),
-          'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
-          'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
-          'tu_open': time_until_open_str if time_until_open_str is not None else "",
-          'tu_close': time_until_close_str if time_until_close_str is not None else ""
-        }
+        to_send = get_all_data()
         socketio.emit('data', to_send)
         time.sleep(1.0)
+
+def data_log_task():
+    # Form log file name in form log/YY_MM_DD.csv
+    def get_log_file_name():
+        current_date = datetime.now()
+        formatted_date = current_date.strftime("%Y_%m_%d")
+        return os.path.join(os.path.join(root_path, "log"), formatted_date + ".csv")
+
+    # Make log directory:
+    log_dir = os.path.dirname(get_log_file_name())
+    os.makedirs(log_dir, exist_ok=True)
+
+    last_log_file_name = ""
+    while True:
+        data = get_all_data()
+
+        # Open new log file and write CSV header if it is a new day
+        log_file_name = get_log_file_name()
+        if log_file_name != last_log_file_name:
+            with open(log_file_name, 'a') as file:
+                header = "# " + ", ".join(data.keys()) + "\n"
+                file.write(header)
+
+        # Append data to file:
+        with open(log_file_name, 'a') as file:
+            row = ", ".join(data.values()) + "\n"
+            file.write(row)
+
+        # Sleep a bit:
+        last_log_file_name = log_file_name
+        time.sleep(5.0)
 
 ##################################
 # Websocket handlers:
@@ -375,6 +412,11 @@ if __name__ == '__main__':
     temp_thread = Thread(target=temperature_task)
     temp_thread.daemon = True
     temp_thread.start()
+
+    # Start the task that logs data to CSV files:
+    log_thread = Thread(target=data_log_task)
+    log_thread.daemon = True
+    log_thread.start()
 
     # Start the Flask app
     socketio.run(app, debug=False, host='0.0.0.0')
