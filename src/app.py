@@ -250,12 +250,10 @@ def door_task():
             if current_time >= close_time and current_time <= close_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "closed")
 
-        # Handle door position. If we are in override mode, then we periodically read the switch.
+        # If we are in override mode, then the door is being moved by the switch.
         if door_override:
-            # First we read the switch. Most switch actuations are handled immediately by the event
-            # detection interrupt, but sometimes the edge transitions get missed. To make things a bit
-            # more robust, we also read the switch state periodically, each second.
-            door.read_switch()
+            # See if switch is turned off, if so, stop the door.
+            door.check_if_switch_neutral()
 
             # Set the desired state to stopped, so that
             # when override switch is no longer being used,
@@ -263,7 +261,7 @@ def door_task():
             # pressed.
             global_vars.instance().set_value("desired_door_state", "stopped")
 
-        # If we are not in override mode, and the door state does not match the desired door state, then
+        # If the door state does not match the desired door state, then
         # we need to move the door.
         elif door_state != d_door_state:
             match d_door_state:
@@ -298,7 +296,8 @@ def door_task():
         # as long as it is in the nuetral position. This helps us catch a switch close or open that
         # sometimes gets missed by the edge detection.
         else:
-            door.read_switch(nuetral_state=door.get_state())
+            # Check if switch off, if so, stop the door.
+            door.check_if_switch_neutral(nuetral_state=door.get_state())
             door_move_count = 0
 
         # Set global state

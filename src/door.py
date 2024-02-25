@@ -24,31 +24,35 @@ class DOOR():
         # Set up switch detection:
         GPIO.setup(o_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(c_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        GPIO.add_event_detect(o_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=500)
-        GPIO.add_event_detect(c_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=500)
+        GPIO.add_event_detect(o_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=600)
+        GPIO.add_event_detect(c_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=600)
 
-    def read_switch(self, nuetral_state="stopped"):
+    # Open or close door if switch activated:
+    def switch_activated(self, channel):
+        # Wait just a bit for stability, so we make sure we get
+        # a good reading right after the interrupt.
+        time.sleep(0.15)
+        o_read = GPIO.input(o_pin)
+        c_read = GPIO.input(c_pin)
+        if o_read != c_read:
+            if o_read == GPIO.HIGH:
+                #print("Opening!")
+                self.override = True
+                self.open()
+            elif c_read == GPIO.HIGH:
+                #print("Closing!")
+                self.override = True
+                self.close()
+
+    # When called, stops door if switch is neutral.
+    def check_if_switch_neutral(self, nuetral_state="stopped"):
+        # Wait just a bit for stability:
         o_read = GPIO.input(o_pin)
         c_read = GPIO.input(c_pin)
         if o_read == c_read:
             #print("Do nothing.")
             self.override = False
             self.stop(state=nuetral_state)
-        elif o_read == GPIO.HIGH:
-            #print("Opening!")
-            self.override = True
-            self.open()
-        elif c_read == GPIO.HIGH:
-            #print("Closing!")
-            self.override = True
-            self.close()
-        else:
-            self.override = False
-            self.stop(state=nuetral_state)
-            assert False
-
-    def switch_activated(self, channel):
-        self.read_switch()
 
     def get_state(self):
         return self.state
