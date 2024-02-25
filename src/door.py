@@ -27,13 +27,13 @@ class DOOR():
         GPIO.add_event_detect(o_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=500)
         GPIO.add_event_detect(c_pin, GPIO.BOTH, callback=self.switch_activated, bouncetime=500)
 
-    def switch_activated(self, channel):
+    def read_switch(self, nuetral_state="stopped"):
         o_read = GPIO.input(o_pin)
         c_read = GPIO.input(c_pin)
         if o_read == c_read:
             #print("Do nothing.")
             self.override = False
-            self.stop()
+            self.stop(state=nuetral_state)
         elif o_read == GPIO.HIGH:
             #print("Opening!")
             self.override = True
@@ -44,8 +44,11 @@ class DOOR():
             self.close()
         else:
             self.override = False
-            self.stop()
+            self.stop(state=nuetral_state)
             assert False
+
+    def switch_activated(self, channel):
+        self.read_switch()
 
     def get_state(self):
         return self.state
@@ -53,7 +56,7 @@ class DOOR():
     def get_override(self):
         return self.override
 
-    def stop(self, state = "stopped"):
+    def stop(self, state="stopped"):
         GPIO.output(in1, GPIO.LOW)
         GPIO.output(in2, GPIO.LOW)
         GPIO.output(ena, GPIO.LOW)

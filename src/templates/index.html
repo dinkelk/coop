@@ -56,7 +56,7 @@
         }
 
         .toggle.on {
-          background-color: #8bc34a;
+          background-color: #90d590;
         }
 
         .toggle.on:before {
@@ -143,7 +143,10 @@
             background-color: #ff6f6f;
         }
 
-        .button.open,
+        .button.open {
+            background-color: #90d590;
+        }
+
         .button.close {
             background-color: #999;
         }
@@ -183,16 +186,21 @@
             document.getElementById('cpu_temp').textContent = data.cpu_temp;
             document.getElementById('cpu_temp_min').textContent = data.cpu_temp_min;
             document.getElementById('cpu_temp_max').textContent = data.cpu_temp_max;
-            document.getElementById('override').textContent = data.override;
             document.getElementById('uptime').textContent = data.uptime;
             document.getElementById('sunrise').textContent = data.sunrise;
             document.getElementById('sunset').textContent = data.sunset;
             document.getElementById('tu_open').textContent = data.tu_open;
             document.getElementById('tu_close').textContent = data.tu_close;
-            if (current_state !== data.state) {
-                // document.getElementById('state').textContent = data.state;
-              document.getElementById('state').innerHTML = `<center><img src="static/${data.state}.png" alt="${data.state}" width="90px"><br>${data.state}</center>`;
-                current_state = data.state;
+            if (data.override !== "off") {
+                if (current_state !== (data.override + ".switch")) {
+                    document.getElementById('state').innerHTML = `<center><img src="static/${data.override}.png" alt="${data.override}" width="90px"><br>${data.override} (via switch)</center>`;
+                    current_state = data.override + ".switch";
+                }
+            } else {
+                if (current_state !== data.state) {
+                    document.getElementById('state').innerHTML = `<center><img src="static/${data.state}.png" alt="${data.state}" width="90px"><br>${data.state}</center>`;
+                    current_state = data.state;
+                }
             }
         });
 
@@ -284,20 +292,14 @@
             <h3 class="title">Door Control</h3>
             <table>
                 <tr>
-                    <td colspan="2"><span id="state"></span></td>
-                </tr>
-                <tr>
-                    <td colspan="2">
-                      <div class="button-container" style="margin-top: 0px;">
-                          <button class="button close" onclick="sendCloseCommand()">Close</button>
-                          <button class="button stop" onclick="sendStopCommand()">Stop</button>
-                          <button class="button open" onclick="sendOpenCommand()">Open</button>
-                      </div>
+                    <td>
+                        <span id="state"></span>
+                        <div class="button-container" style="margin-top: 20px;">
+                            <button class="button close" onclick="sendCloseCommand()">Close</button>
+                            <button class="button stop" onclick="sendStopCommand()">Stop</button>
+                            <button class="button open" onclick="sendOpenCommand()">Open</button>
+                        </div>
                     </td>
-                </tr>
-                <tr>
-                    <td><b>Switch Position</b></td>
-                    <td><span id="override"></span></td>
                 </tr>
             </table>
             <div class="toggle-container" style="margin-bottom: 0px;">
@@ -307,7 +309,7 @@
             <div id="auto_info" class="auto_info {% if auto_mode %} on{% endif %}">
             <table style="margin-top: 0px;">
                 <tr>
-                    <td colspan="2">
+                    <td colspan="2"
                         <form onsubmit="handleSubmit(event)">
                             <label for="sunrise_offset">Open door at sunrise plus </label>
                             <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunrise_offset }} required>
@@ -318,8 +320,8 @@
                             <label> minutes.</label><br/>
 
 
-                            <div class="button-container">
-                                <button class="button close" type="submit">Save</button>
+                            <div class="button-container" style="margin-top: 20px;">
+                                <button class="button open" type="submit">Save</button>
                             </div>
                         </form>
 

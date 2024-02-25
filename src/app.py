@@ -144,7 +144,7 @@ def get_all_data():
       'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
       'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
       'state': state if state is not None else "",
-      'override': state if override else "off",
+      'override': state if state is not None and override else "off",
       'uptime': str(get_uptime()),
       'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
       'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
@@ -250,13 +250,21 @@ def door_task():
             if current_time >= close_time and current_time <= close_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "closed")
 
-        # Handle door:
+        # Handle door position. If we are in override mode, then we periodically read the switch.
         if door_override:
+            # First we read the switch. Most switch actuations are handled immediately by the event
+            # detection interrupt, but sometimes the edge transitions get missed. To make things a bit
+            # more robust, we also read the switch state periodically, each second.
+            door.read_switch()
+
             # Set the desired state to stopped, so that
             # when override switch is no longer being used,
             # we don't move the motor until a new button is
             # pressed.
             global_vars.instance().set_value("desired_door_state", "stopped")
+
+        # If we are not in override mode, and the door state does not match the desired door state, then
+        # we need to move the door.
         elif door_state != d_door_state:
             match d_door_state:
                 case "stopped":
@@ -284,8 +292,13 @@ def door_task():
                     door.stop()
                     door_move_count = 0
                     assert False, "Unknown state: " + str(d_door_state)
+
+        # We are not in switch override, and the door is in the desired state. The door should be
+        # stopped. We can do this most robustly by also checking the switch, which will stop the door
+        # as long as it is in the nuetral position. This helps us catch a switch close or open that
+        # sometimes gets missed by the edge detection.
         else:
-            door.stop(door_state)
+            door.read_switch(nuetral_state=door.get_state())
             door_move_count = 0
 
         # Set global state
@@ -294,7 +307,7 @@ def door_task():
         door_override = door.get_override()
         global_vars.instance().set_values({ \
             "state": door_state, \
-            "door_override": door_override, \
+            "override": door_override, \
             "sunrise": sunrise, \
             "sunset": sunset \
         })
