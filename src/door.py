@@ -5,8 +5,8 @@ import time
 in1 = 24
 in2 = 23
 ena = 25
-o_pin = 4
-c_pin = 17
+o_pin = 17
+c_pin = 4
 
 class DOOR():
     def __init__(self):
