@@ -9,6 +9,10 @@ This is the [Raspberry Pi](https://www.raspberrypi.com) based controller softwar
   4. A simple [Flask](https://flask.palletsprojects.com/en) web app using to view the current temperature and humidity and control the door
   5. Logging of all data to CSV files
 
+## The Web App
+
+Below is the simple UI for the coop controller. It works well on a PC browser or phone.
+
  ![`Coop App`](img/app.png "app.png")
 
 ## How it is Wired Up
