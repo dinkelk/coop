@@ -1,8 +1,6 @@
 # Dinky Coop
 *Those chickens won't open the door themselves.*
 
- ![`Coop App`](img/app.gif "app.git")
-
 This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It currently exhibits the following capabilities:
 
   1. Automatic open and closing of coop door based on sunrise and sunset time (and configurable offset)
@@ -10,6 +8,8 @@ This is the [Raspberry Pi](https://www.raspberrypi.com) based controller softwar
   3. Temperature and humidity sensing inside and outside the coop
   4. A simple [Flask](https://flask.palletsprojects.com/en) web app using to view the current temperature and humidity and control the door
   5. Logging of all data to CSV files
+
+ ![`Coop App`](img/app.png"app.png")
 
 ## How it is Wired Up
 
