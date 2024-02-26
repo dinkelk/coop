@@ -1,13 +1,13 @@
 # Dinky Coop
 *Those chickens won't open the door themselves.*
 
-This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It currently exhibits the following capabilities:
+This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It exhibits the following capabilities:
 
   1. Automatic open and closing of coop door based on sunrise and sunset time (and configurable offset)
   2. Open and closing of the coop door via an external 3 position switch
   3. Temperature and humidity sensing inside and outside the coop
-  4. A simple [Flask](https://flask.palletsprojects.com/en) web app using to view the current temperature and humidity and control the door
-  5. Logging of all data to CSV files
+  4. Logging of all data to CSV files
+  5. A simple [Flask](https://flask.palletsprojects.com/en) web app to view temperature and humidity and command the door
 
 ## The Web App
 
@@ -54,4 +54,3 @@ To start the controller automatically at boot, run `crontab -e` and append the f
 ## Future Improvements
 
   1. Show temp/humidity plot of last 36 hours
-  2. Make webpage look nicer, photos, animations, icons
