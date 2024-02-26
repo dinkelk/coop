@@ -1,7 +1,10 @@
 # Dinky Coop
-*Those chickens won't open the door themselves.*
+*Those chickens won't open the door themselves...*
 
- ![`Coop App`](img/door.gif "door.gif")
+ |  ![`Coop App`](img/door.gif "door.gif") | 
+ |:--:| 
+ |  *Automatic door powered by linear actuator, video sped up 2.5x.* |
+
 
 This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It exhibits the following capabilities:
 
@@ -23,7 +26,7 @@ This is how things are connected, drawn using [Fritzing](https://fritzing.org/).
 
  ![`Coop Wiring Diagram`](img/coop_bb.svg "coop_bb.svg")
 
-## How it is Run
+## How to Install
 
 On your Raspberry Pi, run the following:
 
@@ -39,7 +42,7 @@ $ python3 src/app.py
 
 Now access the webserver with a browser at http://127.0.0.1:5000.
 
-Sometimes it is necessary to reset CircuitPython after errors like 'Unable to set line 21 to input' by running:
+**Note:** Sometimes it is necessary to reset CircuitPython after encountering errors like `Unable to set line 21 to input` by running:
 
 ```
 $ killall libgpiod_pulsein64
@@ -55,4 +58,4 @@ To start the controller automatically at boot, run `crontab -e` and append the f
 
 ## Future Improvements
 
-  1. Show temp/humidity plot of last 36 hours
+  1. Show temperature/humidity plot of last 36 hours
