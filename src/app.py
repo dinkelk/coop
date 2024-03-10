@@ -178,10 +178,10 @@ def temperature_task():
         temp_out, hum_out = dht_out.get_temperature_and_humidity()
         temp_in, hum_in = dht_in.get_temperature_and_humidity()
 
-        if temp_out is not None and hum_out is not None:
-            print("Outside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_out, hum_out))
-        if temp_in is not None and hum_in is not None:
-            print("Inside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_in, hum_in))
+        #if temp_out is not None and hum_out is not None:
+        #    print("Outside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_out, hum_out))
+        #if temp_in is not None and hum_in is not None:
+        #    print("Inside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_in, hum_in))
 
         # If it is midnight then reset the mins and maxes so we get fresh values for the new day:
         current_date = date.today()

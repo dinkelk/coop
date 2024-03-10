@@ -10,4 +10,5 @@
 
 this_dir=`readlink -f "${BASH_SOURCE[0]}" | xargs dirname`
 . $this_dir/venv/bin/activate
-python $this_dir/src/app.py >/dev/null 2>/dev/null
+log=$this_dir/log/app.log
+python $this_dir/src/app.py >>$log 2>>$log
