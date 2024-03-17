@@ -158,8 +158,8 @@ def get_all_data():
 ##################################
 
 def temperature_task():
-    dht_out = DHT22(board.D21)
-    dht_in = DHT22(board.D16)
+    dht_out = DHT22(data_pin=board.D21, power_pin=20)
+    dht_in = DHT22(data_pin=board.D16, power_pin=26)
     last_date = None
 
     # Update value in global vars, and also store min and max seen since startup:
