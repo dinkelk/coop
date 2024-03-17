@@ -159,7 +159,7 @@ def get_all_data():
 
 def temperature_task():
     dht_out = DHT22(board.D21)
-    dht_in = DHT22(board.D20)
+    dht_in = DHT22(board.D16)
     last_date = None
 
     # Update value in global vars, and also store min and max seen since startup:
@@ -205,7 +205,7 @@ def temperature_task():
         cpu_temp = CPUTemperature().temperature
         update_val(cpu_temp, "cpu_temp")
 
-        time.sleep(1.0)
+        time.sleep(2.5)
 
 # Background thread for managing coop door in real-time.
 def door_task():

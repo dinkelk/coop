@@ -18,7 +18,7 @@ class DHT22():
                 hum = self.dht.humidity
                 break
             except (RuntimeError, OverflowError):
-                time.sleep(2.0)
+                time.sleep(2.5)
                 continue
 
         if temp_c is not None:
