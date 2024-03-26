@@ -165,13 +165,24 @@ def temperature_task():
     # Update value in global vars, and also store min and max seen since startup:
     def update_val(val, name):
         if val is not None:
-            val_max, val_min = global_vars.instance().get_values([name + "_max", name + "_min"])
+            # Get current vals
+            val_old, val_max, val_min = \
+                global_vars.instance().get_values([name, name + "_max", name + "_min"])
+
+            # Throw away any errant readings. Sometimes the readings are nonsensical
+            if val_old is not None:
+                if val > (val_old + 5.0) or val < (val_old - 5.0):
+                    val = val_old
+
+            # Update min and max
             val_max = val_max if val_max is not None else -500
             val_min = val_min if val_min is not None else 500
             if val > val_max:
                 val_max = val
             if val < val_min:
                 val_min = val
+
+            # Set new vals
             global_vars.instance().set_values({name: val, name + "_max": val_max, name + "_min": val_min})
 
     while True:
@@ -213,6 +224,12 @@ def door_task():
     door_move_count = 0
     DOOR_MOVE_MAX = 35 # seconds
     first_iter = True
+    sunrise = None
+    door_state = None
+    door_override = None
+    sunrise = None
+    sunset = None
+
     while True:
         # Get state and desired state:
         door_state = door.get_state()
