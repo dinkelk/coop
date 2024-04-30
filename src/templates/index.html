@@ -309,7 +309,7 @@
             <div id="auto_info" class="auto_info {% if auto_mode %} on{% endif %}">
             <table style="margin-top: 0px;">
                 <tr>
-                    <td colspan="2"
+                    <td colspan="2">
                         <form onsubmit="handleSubmit(event)">
                             <label for="sunrise_offset">Open door at sunrise plus </label>
                             <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunrise_offset }} required>
@@ -319,13 +319,11 @@
                             <input type="number" id="sunset_offset" name="sunset_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunset_offset }} required>
                             <label> minutes.</label><br/>
 
-
                             <div class="button-container" style="margin-top: 20px;">
                                 <button class="button open" type="submit">Save</button>
                             </div>
                         </form>
-
-                </td>
+                    </td>
                 <tr>
                     <td><b>Sunrise</b></td>
                     <td><span id="sunrise"></span></td>
