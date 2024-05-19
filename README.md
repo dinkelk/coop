@@ -56,6 +56,16 @@ To start the controller automatically at boot, run `crontab -e` and append the f
 @reboot /home/pi/coop/cron_script.sh
 ```
 
+## Network Monitoring
+
+My Raspberry Pi is on a flaky network connection and sometimes it is necessary to periodically reset the Wi-Fi. A script is included to monitor the connection and reset it if necessary. To install this script run `sudo crontab -e` and append the following entry.
+
+```
+@reboot /home/pi/coop/check_network.sh 8.8.8.8
+```
+
+Replace `8.8.8.8` with the IP address of your router if you just want to check local network connectivity.
+
 ## Future Improvements
 
   1. Show temperature/humidity plot of last 36 hours
