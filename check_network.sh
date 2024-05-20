@@ -6,8 +6,8 @@ if [ -z "$1" ]; then
 fi
 
 PING_IP="$1"                     # Can use 8.8.8.8 for Google DNS
-CONNECTIVITY_CHECK_INTERVAL=30   # Check every 30 seconds
-MAX_DOWN_TIME_RESTART_WIFI=120   # Restart WiFi after 2 minutes
+CONNECTIVITY_CHECK_INTERVAL=60   # Check every 60 seconds
+MAX_DOWN_TIME_RESTART_WIFI=180   # Restart WiFi after 3 minutes
 MAX_DOWN_TIME_REBOOT=600         # Reboot system after 10 minutes
 
 RECONNECT_CMD="/sbin/ifconfig wlan0 down && sleep 5 && /sbin/ifconfig wlan0 up"
@@ -36,7 +36,6 @@ while true; do
     elif ((disconnect_time>=MAX_DOWN_TIME_RESTART_WIFI)); then
       log "Restarting Wi-Fi connection..."
       $RECONNECT_CMD
-      disconnect_time=0
     fi
   fi
   sleep $CONNECTIVITY_CHECK_INTERVAL
