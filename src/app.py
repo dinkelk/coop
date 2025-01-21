@@ -89,13 +89,13 @@ def get_all_data():
         sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
         temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
         temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
-        cpu_temp_min, cpu_temp_max \
+        cpu_temp_min, cpu_temp_max, too_cold \
         = global_vars.instance().get_values(["temp_in", "hum_in", \
             "temp_out", "hum_out", "state", "override", "cpu_temp", \
             "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
             "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
             "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
-            "cpu_temp_min", "cpu_temp_max"])
+            "cpu_temp_min", "cpu_temp_max", "too_cold"])
 
     # Check if time until sunrise is positive
     time_until_open_str = None
@@ -149,7 +149,8 @@ def get_all_data():
       'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
       'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
       'tu_open': time_until_open_str if time_until_open_str is not None else "",
-      'tu_close': time_until_close_str if time_until_close_str is not None else ""
+      'tu_close': time_until_close_str if time_until_close_str is not None else "",
+      'too_cold' : "true" if too_cold else "false"
     }
     return data_dict
 
@@ -229,13 +230,14 @@ def door_task():
     door_override = None
     sunrise = None
     sunset = None
+    too_cold = False
 
     while True:
         # Get state and desired state:
         door_state = door.get_state()
         door_override = door.get_override()
-        d_door_state, auto_mode = \
-            global_vars.instance().get_values(["desired_door_state", "auto_mode"])
+        d_door_state, auto_mode, temp_out = \
+            global_vars.instance().get_values(["desired_door_state", "auto_mode", "temp_out"])
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
@@ -281,32 +283,49 @@ def door_task():
         # If the door state does not match the desired door state, then
         # we need to move the door.
         elif door_state != d_door_state:
-            match d_door_state:
-                case "stopped":
-                    if door_state in ["open", "closed"]:
-                        door.stop(door_state)
-                        door_move_count = 0
-                    else:
+            # Temperature fault protection. Driving the motor while it is too cold breaks
+            # the motor controller. We allow a user to do this with the manual switch, but
+            # we do not allow auto mode to open close the door if it is too cold.
+            #
+            # The temperature limit on the motor controller is -25C which is -13F. We need
+            # a safety factor on this however, because I noticed the motor performance
+            # degrading at ~10F. So for now lets make it 10F, for now.
+            #
+            # TODO add a heater to the control box so this condition is never encountered.
+            if temp_out is not None and temp_out < 10:
+                if door_state in ["opening", "closing"]:
+                    door.stop()
+                else:
+                    door.stop(door_state)
+                door_move_count = 0
+                too_cold = True
+            else:
+                match d_door_state:
+                    case "stopped":
+                        if door_state in ["open", "closed"]:
+                            door.stop(door_state)
+                            door_move_count = 0
+                        else:
+                            door.stop()
+                            door_move_count = 0
+                    case "open":
+                        if door_move_count <= DOOR_MOVE_MAX:
+                            door.open()
+                            door_move_count += 1
+                        else:
+                            door.stop("open")
+                            door_move_count = 0
+                    case "closed":
+                        if door_move_count <= DOOR_MOVE_MAX:
+                            door.close()
+                            door_move_count += 1
+                        else:
+                            door.stop("closed")
+                            door_move_count = 0
+                    case _:
                         door.stop()
                         door_move_count = 0
-                case "open":
-                    if door_move_count <= DOOR_MOVE_MAX:
-                        door.open()
-                        door_move_count += 1
-                    else:
-                        door.stop("open")
-                        door_move_count = 0
-                case "closed":
-                    if door_move_count <= DOOR_MOVE_MAX:
-                        door.close()
-                        door_move_count += 1
-                    else:
-                        door.stop("closed")
-                        door_move_count = 0
-                case _:
-                    door.stop()
-                    door_move_count = 0
-                    assert False, "Unknown state: " + str(d_door_state)
+                        assert False, "Unknown state: " + str(d_door_state)
 
         # We are not in switch override, and the door is in the desired state. The door should be
         # stopped. We can do this most robustly by also checking the switch, which will stop the door
@@ -324,6 +343,7 @@ def door_task():
         global_vars.instance().set_values({ \
             "state": door_state, \
             "override": door_override, \
+            "too_cold": too_cold, \
             "sunrise": sunrise, \
             "sunset": sunset \
         })

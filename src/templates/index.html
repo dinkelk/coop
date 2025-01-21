@@ -202,6 +202,11 @@
                     current_state = data.state;
                 }
             }
+            if (data.too_cold == "true") {
+                document.getElementById('too_cold').innerHTML = `<center><br>DOOR DISABLED (too cold)</center>`;
+            } else {
+                document.getElementById('too_cold').innerHTML = ``;
+            }
         });
 
         function sendOpenCommand() {
@@ -294,6 +299,7 @@
                 <tr>
                     <td>
                         <span id="state"></span>
+                        <span id="too_cold"></span>
                         <div class="button-container" style="margin-top: 20px;">
                             <button class="button close" onclick="sendCloseCommand()">Close</button>
                             <button class="button stop" onclick="sendStopCommand()">Stop</button>
