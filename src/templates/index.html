@@ -151,6 +151,10 @@
             background-color: #999;
         }
 
+        .button.off {
+            background-color: #90D5D5;
+        }
+
         .button:last-child {
             margin-right: 0;
         }
@@ -168,6 +172,7 @@
         var socket = io();
 
         let current_state = ""
+        let current_heater_state = ""
 
         socket.on('data', function(data) {
             console.log('Received data:', data);
@@ -197,6 +202,9 @@
             document.getElementById('sunset').textContent = data.sunset;
             document.getElementById('tu_open').textContent = data.tu_open;
             document.getElementById('tu_close').textContent = data.tu_close;
+            document.getElementById('cpu_usage').textContent = data.cpu_usage;
+            document.getElementById('cpu_usage2').textContent = data.cpu_usage;
+            document.getElementById('current_time').textContent = data.current_time;
             if (data.override !== "off") {
                 if (current_state !== (data.override + ".switch")) {
                     document.getElementById('state').innerHTML = `<center><img src="static/${data.override}.png" alt="${data.override}" width="90px"><br>${data.override} (via switch)</center>`;
@@ -213,6 +221,11 @@
             } else {
                 document.getElementById('too_cold').innerHTML = ``;
             }
+
+                if (current_heater_state !== data.heater_state) {
+                    document.getElementById('heater_state').innerHTML = `<center><img src="static/${data.heater_state}.png" alt="${data.heater_state}" width="90px"><br>${data.heater_state}</center>`;
+                    current_heater_state = data.heater_state;
+                }
         });
 
         function sendOpenCommand() {
@@ -257,68 +270,40 @@
     <div class="container">
         <div class="content">
             <h1>Dinky Coop</h1>
-            <h3 class="title">System</h3>
+            <center><span id="current_time"></span></center>
+            <h3 class="title">Environment</h3>
             <table>
                 <tr>
-                    <td><b>Uptime</b></td>
-                    <td colspan="3"><span id="uptime"></span></td>
-                </tr>
-                <tr>
-                    <td><b>CPU Temperature</b></td>
-                    <td><span id="cpu_temp_min" style="color: #0d98ba;"></span></td>
-                    <td><span id="cpu_temp" style="font-weight: bold;"></span></td>
-                    <td><span id="cpu_temp_max" style="color: #ff8c00;"></span></td>
-                </tr>
-            </table>
-            <h3 class="title">Inside</h3>
-            <table>
-                <tr>
-                    <td><b>Temperature</b></td>
+                    <td><b>Inside Temperature</b></td>
                     <td><span id="temp_in_min" style="color: #0d98ba;"></span></td>
                     <td><span id="temp_in" style="font-weight: bold;"></span></td>
                     <td><span id="temp_in_max" style="color: #ff8c00;"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Humidity</b></td>
+                    <td><b>Inside Humidity</b></td>
                     <td><span id="hum_in_min" style="color: #0d98ba;"></span></td>
                     <td><span id="hum_in" style="font-weight: bold;"></span></td>
                     <td><span id="hum_in_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
-            <h3 class="title">Outside</h3>
             <table>
                 <tr>
-                    <td><b>Temperature</b></td>
+                    <td><b>Outside Temperature</b></td>
                     <td><span id="temp_out_min" style="color: #0d98ba;"></span></td>
                     <td><span id="temp_out" style="font-weight: bold;"></span></td>
                     <td><span id="temp_out_max" style="color: #ff8c00;"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Humidity</b></td>
+                    <td><b>Outside Humidity</b></td>
                     <td><span id="hum_out_min" style="color: #0d98ba;"></span></td>
                     <td><span id="hum_out" style="font-weight: bold;"></span></td>
                     <td><span id="hum_out_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
-            <h3 class="title">Electrical Box</h3>
-            <table>
-                <tr>
-                    <td><b>Temperature</b></td>
-                    <td><span id="temp_box_min" style="color: #0d98ba;"></span></td>
-                    <td><span id="temp_box" style="font-weight: bold;"></span></td>
-                    <td><span id="temp_box_max" style="color: #ff8c00;"></span></td>
-                </tr>
-                <tr>
-                    <td><b>Humidity</b></td>
-                    <td><span id="hum_box_min" style="color: #0d98ba;"></span></td>
-                    <td><span id="hum_box" style="font-weight: bold;"></span></td>
-                    <td><span id="hum_box_max" style="color: #ff8c00;"></span></td>
-                </tr>
-            </table>
             <h3 class="title">Door Control</h3>
             <table>
                 <tr>
-                    <td>
+                    <td style="padding-bottom: 20px;">
                         <span id="state"></span>
                         <span id="too_cold"></span>
                         <div class="button-container" style="margin-top: 20px;">
@@ -330,13 +315,13 @@
                 </tr>
             </table>
             <div class="toggle-container" style="margin-bottom: 0px;">
-                <h3 class="title" style="margin-right: 20px; margin-top: 10px;">Auto Mode</h3>
+                <h4 class="title" style="margin-right: 20px; margin-top: 10px;">Auto Mode</h4>
                 <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
             </div>
             <div id="auto_info" class="auto_info {% if auto_mode %} on{% endif %}">
             <table style="margin-top: 0px;">
                 <tr>
-                    <td colspan="2">
+                    <td colspan="2" style="padding-top: 30px;">
                         <form onsubmit="handleSubmit(event)">
                             <label for="sunrise_offset">Open door at sunrise plus </label>
                             <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunrise_offset }} required>
@@ -346,7 +331,7 @@
                             <input type="number" id="sunset_offset" name="sunset_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunset_offset }} required>
                             <label> minutes.</label><br/>
 
-                            <div class="button-container" style="margin-top: 20px;">
+                            <div class="button-container" style="margin-top: 30px; margin-bottom: 10px;">
                                 <button class="button open" type="submit">Save</button>
                             </div>
                         </form>
@@ -369,6 +354,70 @@
                 </tr>
             </table>
             </div>
+            <h3 class="title">System</h3>
+            <table>
+                <tr>
+                    <td><b>Uptime</b></td>
+                    <td colspan="3"><span id="uptime"></span></td>
+                </tr>
+                <tr>
+                    <td><b>CPU Temperature</b></td>
+                    <td><span id="cpu_temp_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="cpu_temp" style="font-weight: bold;"></span></td>
+                    <td><span id="cpu_temp_max" style="color: #ff8c00;"></span></td>
+                </tr>
+                <tr>
+                    <td><b>CPU Usage</b></td>
+                    <td colspan="3"><span id="cpu_usage"></span></td>
+                </tr>
+            </table>
+            <table>
+                <tr>
+                    <td><b>Box Temperature</b></td>
+                    <td><span id="temp_box_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="temp_box" style="font-weight: bold;"></span></td>
+                    <td><span id="temp_box_max" style="color: #ff8c00;"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Box Humidity</b></td>
+                    <td><span id="hum_box_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="hum_box" style="font-weight: bold;"></span></td>
+                    <td><span id="hum_box_max" style="color: #ff8c00;"></span></td>
+                </tr>
+            </table>
+            <h3 class="title">Heater Control</h3>
+            <table>
+                <tr>
+                    <td style="padding-bottom: 20px;">
+                        <span id="heater_state"></span>
+                        <center>(<span id="cpu_usage2"></span>)</center>
+                        <div class="button-container" style="margin-top: 20px;">
+                            <button class="button stop" onclick="sendCloseCommand()">On</button>
+                            <button class="button close" onclick="sendStopCommand()">Auto</button>
+                            <button class="button off" onclick="sendStopCommand()">Off</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding-top: 30px;">
+                        <form onsubmit="handleSubmit(event)">
+                            <label for="heat_on_temp">Turn box heater on below </label>
+                            <input type="number" id="heat_on_temp" name="heat_on_temp" step="1" maxlength="4" style="width: 50px;" value={{ heat_on_temp }} required>
+                            <label>&deg;F.</label><br/>
+
+                            <label for="heat_off_temp">Turn box heater off at </label>
+                            <input type="number" id="heat_off_temp" name="heat_off_temp" step="1" maxlength="4" style="width: 50px;" value={{ heat_off_temp }} required>
+                            <label>&deg;F.</label><br/>
+                            <label for="cpu_overheat_temp">Do not let CPU overheat above </label>
+                            <input type="number" id="cpu_overheat_temp" name="cpu_overheat_temp" step="1" maxlength="4" style="width: 50px;" value={{ cpu_overheat_temp }} required>
+                            <label>&deg;C.</label><br/>
+
+                            <div class="button-container" style="margin-top: 30px;">
+                                <button class="button open" type="submit">Save</button>
+                            </div>
+                        </form>
+                    </td>
+            </table>
         </div>
     </div>
 </body>

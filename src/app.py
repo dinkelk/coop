@@ -91,7 +91,8 @@ def get_all_data():
         temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
         temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
         cpu_temp_min, cpu_temp_max, too_cold, temp_box, hum_box, \
-        temp_box_min, temp_box_max, hum_box_min, hum_box_max \
+        temp_box_min, temp_box_max, hum_box_min, hum_box_max, \
+        cpu_usage, heater_state \
         = global_vars.instance().get_values(["temp_in", "hum_in", \
             "temp_out", "hum_out", "state", "override", "cpu_temp", \
             "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
@@ -99,7 +100,7 @@ def get_all_data():
             "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
             "cpu_temp_min", "cpu_temp_max", "too_cold", "temp_box", \
             "hum_box", "temp_box_min", "temp_box_max", "hum_box_min", \
-            "hum_box_max"])
+            "hum_box_max", "cpu_usage", "heater_state"])
 
     # Check if time until sunrise is positive
     time_until_open_str = None
@@ -160,9 +161,11 @@ def get_all_data():
       'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
       'tu_open': time_until_open_str if time_until_open_str is not None else "",
       'tu_close': time_until_close_str if time_until_close_str is not None else "",
-      'too_cold' : "true" if too_cold else "false"
+      'too_cold' : "true" if too_cold else "false",
+      'cpu_usage' : format_hum(cpu_usage),
+      'heater_state' : "on" if heater_state else "off",
+      'current_time' : datetime.now().strftime("%B %-d, %Y, %-I:%M:%S %p")
     }
-    print("returnig: " + str(cpu_temp))
     return data_dict
 
 ##################################
@@ -232,7 +235,6 @@ def temperature_task():
 
         # Set CPU temperature:
         cpu_temp = CPUTemperature().temperature
-        print(str(cpu_temp))
         update_val(cpu_temp, "cpu_temp", max_change_per_reading=20.0)
 
         time.sleep(2.5)
@@ -380,8 +382,8 @@ def heat_box_task():
         return cpu_usage
 
     # TODO make these variable
-    heat_on_temp = 38 # F
-    heat_off_temp = 39 # F
+    heat_on_temp = 33 # F
+    heat_off_temp = 36 # F
     cpu_max_temp = 75 # C
 
     while True:
@@ -404,14 +406,10 @@ def heat_box_task():
             elif temp_box > heat_off_temp and are_workers_active():
                 stop_workers()
 
-        # TODO make these show on page
-        if are_workers_active():
-            print("Pi is heating!")
-        else:
-            print("Pi is not heating!")
-
-        usage = get_cpu_usage()
-        print(f"Current CPU usage: {usage}%")
+        global_vars.instance().set_values({ \
+            "cpu_usage": get_cpu_usage(), \
+            "heater_state": are_workers_active()
+        })
 
         # Check again in a bit
         time.sleep(5.0)
