@@ -183,6 +183,12 @@
             document.getElementById('hum_out').textContent = data.hum_out;
             document.getElementById('hum_out_min').textContent = data.hum_out_min;
             document.getElementById('hum_out_max').textContent = data.hum_out_max;
+            document.getElementById('temp_box').textContent = data.temp_box;
+            document.getElementById('temp_box_min').textContent = data.temp_box_min;
+            document.getElementById('temp_box_max').textContent = data.temp_box_max;
+            document.getElementById('hum_box').textContent = data.hum_box;
+            document.getElementById('hum_box_min').textContent = data.hum_box_min;
+            document.getElementById('hum_box_max').textContent = data.hum_box_max;
             document.getElementById('cpu_temp').textContent = data.cpu_temp;
             document.getElementById('cpu_temp_min').textContent = data.cpu_temp_min;
             document.getElementById('cpu_temp_max').textContent = data.cpu_temp_max;
@@ -292,6 +298,21 @@
                     <td><span id="hum_out_min" style="color: #0d98ba;"></span></td>
                     <td><span id="hum_out" style="font-weight: bold;"></span></td>
                     <td><span id="hum_out_max" style="color: #ff8c00;"></span></td>
+                </tr>
+            </table>
+            <h3 class="title">Electrical Box</h3>
+            <table>
+                <tr>
+                    <td><b>Temperature</b></td>
+                    <td><span id="temp_box_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="temp_box" style="font-weight: bold;"></span></td>
+                    <td><span id="temp_box_max" style="color: #ff8c00;"></span></td>
+                </tr>
+                <tr>
+                    <td><b>Humidity</b></td>
+                    <td><span id="hum_box_min" style="color: #0d98ba;"></span></td>
+                    <td><span id="hum_box" style="font-weight: bold;"></span></td>
+                    <td><span id="hum_box_max" style="color: #ff8c00;"></span></td>
                 </tr>
             </table>
             <h3 class="title">Door Control</h3>

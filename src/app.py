@@ -9,6 +9,7 @@ from astral.sun import sun
 from dht22 import DHT22
 from gpiozero import CPUTemperature
 from door import DOOR
+from compute_pi import start_workers, stop_workers, are_workers_active
 import time
 import psutil
 import pytz
@@ -89,13 +90,16 @@ def get_all_data():
         sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
         temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
         temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
-        cpu_temp_min, cpu_temp_max, too_cold \
+        cpu_temp_min, cpu_temp_max, too_cold, temp_box, hum_box, \
+        temp_box_min, temp_box_max, hum_box_min, hum_box_max \
         = global_vars.instance().get_values(["temp_in", "hum_in", \
             "temp_out", "hum_out", "state", "override", "cpu_temp", \
             "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
             "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
             "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
-            "cpu_temp_min", "cpu_temp_max", "too_cold"])
+            "cpu_temp_min", "cpu_temp_max", "too_cold", "temp_box", \
+            "hum_box", "temp_box_min", "temp_box_max", "hum_box_min", \
+            "hum_box_max"])
 
     # Check if time until sunrise is positive
     time_until_open_str = None
@@ -140,6 +144,12 @@ def get_all_data():
       'hum_out': format_hum(hum_out),
       'hum_out_min': format_hum(hum_out_min),
       'hum_out_max': format_hum(hum_out_max),
+      'temp_box': format_temp(temp_box),
+      'temp_box_min': format_temp(temp_box_min),
+      'temp_box_max': format_temp(temp_box_max),
+      'hum_box': format_hum(hum_box),
+      'hum_box_min': format_hum(hum_box_min),
+      'hum_box_max': format_hum(hum_box_max),
       'cpu_temp': format_temp(cpu_temp, units="C"),
       'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
       'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
@@ -152,6 +162,7 @@ def get_all_data():
       'tu_close': time_until_close_str if time_until_close_str is not None else "",
       'too_cold' : "true" if too_cold else "false"
     }
+    print("returnig: " + str(cpu_temp))
     return data_dict
 
 ##################################
@@ -161,10 +172,11 @@ def get_all_data():
 def temperature_task():
     dht_out = DHT22(data_pin=board.D21, power_pin=20)
     dht_in = DHT22(data_pin=board.D16, power_pin=26)
+    dht_box = DHT22(data_pin=board.D19, power_pin=13)
     last_date = None
 
     # Update value in global vars, and also store min and max seen since startup:
-    def update_val(val, name):
+    def update_val(val, name, max_change_per_reading=5.0):
         if val is not None:
             # Get current vals
             val_old, val_max, val_min = \
@@ -172,7 +184,7 @@ def temperature_task():
 
             # Throw away any errant readings. Sometimes the readings are nonsensical
             if val_old is not None:
-                if val > (val_old + 5.0) or val < (val_old - 5.0):
+                if val > (val_old + max_change_per_reading) or val < (val_old - max_change_per_reading):
                     val = val_old
 
             # Update min and max
@@ -189,6 +201,7 @@ def temperature_task():
     while True:
         temp_out, hum_out = dht_out.get_temperature_and_humidity()
         temp_in, hum_in = dht_in.get_temperature_and_humidity()
+        temp_box, hum_box = dht_box.get_temperature_and_humidity()
 
         #if temp_out is not None and hum_out is not None:
         #    print("Outside Temperature={0:0.1f}F Humidity={1:0.1f}%".format(temp_out, hum_out))
@@ -201,8 +214,10 @@ def temperature_task():
             global_vars.instance().set_values({ \
                 "temp_in_min": 500, "temp_in_max": -500, \
                 "temp_out_min": 500, "temp_out_max": -500, \
+                "temp_box_min": 500, "temp_box_max": -500, \
                 "hum_in_min": 500, "hum_in_max": -500, \
                 "hum_out_min": 500, "hum_out_max": -500, \
+                "hum_box_min": 500, "hum_box_max": -500, \
                 "cpu_temp_min": 500, "cpu_temp_max": -500 \
             })
             last_date = current_date
@@ -212,10 +227,13 @@ def temperature_task():
         update_val(hum_in, "hum_in")
         update_val(temp_out, "temp_out")
         update_val(hum_out, "hum_out")
+        update_val(temp_box, "temp_box")
+        update_val(hum_box, "hum_box")
 
         # Set CPU temperature:
         cpu_temp = CPUTemperature().temperature
-        update_val(cpu_temp, "cpu_temp")
+        print(str(cpu_temp))
+        update_val(cpu_temp, "cpu_temp", max_change_per_reading=20.0)
 
         time.sleep(2.5)
 
@@ -236,8 +254,8 @@ def door_task():
         # Get state and desired state:
         door_state = door.get_state()
         door_override = door.get_override()
-        d_door_state, auto_mode, temp_out = \
-            global_vars.instance().get_values(["desired_door_state", "auto_mode", "temp_out"])
+        d_door_state, auto_mode, temp_box = \
+            global_vars.instance().get_values(["desired_door_state", "auto_mode", "temp_box"])
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
@@ -292,7 +310,9 @@ def door_task():
             # degrading at ~10F. So for now lets make it 10F, for now.
             #
             # TODO add a heater to the control box so this condition is never encountered.
-            if temp_out is not None and temp_out < 10:
+            # Need to turn on heating pi when box is below freezing ish
+            # Need to turn off heating pi when CPU > 79 or when box is 5 degress above freezing ish
+            if temp_box is not None and temp_box < 10:
                 if door_state in ["opening", "closing"]:
                     door.stop()
                 else:
@@ -348,6 +368,53 @@ def door_task():
             "sunset": sunset \
         })
         time.sleep(1.0)
+
+# Task to use the raspberry pi as a heater for the electrical box.
+# When it gets to cold, we calculated digits of pi using all 4 cores
+# to warm the CPU and indirectly warm the electrical box.
+def heat_box_task():
+    def get_cpu_usage():
+        # psutil.cpu_percent() gives the average CPU usage across all cores
+        # The interval argument determines the time over which the average is calculated
+        cpu_usage = psutil.cpu_percent(interval=1)
+        return cpu_usage
+
+    # TODO make these variable
+    heat_on_temp = 38 # F
+    heat_off_temp = 39 # F
+    cpu_max_temp = 75 # C
+
+    while True:
+        # Get the current temperature of the electrical box
+        [temp_box, cpu_temp] = global_vars.instance().get_values(["temp_box", "cpu_temp"])
+
+        if temp_box is not None and cpu_temp is not None:
+            # Prevent the CPU from over heating. If we are above the max,
+            # shut down the workers.
+            if cpu_max_temp > cpu_max_temp and are_workers_active():
+                stop_workers()
+
+            # If the box temp is less than the on temp and we are
+            # not yet heating the pi, start heating the pi.
+            elif temp_box < heat_on_temp and not are_workers_active():
+                start_workers(4)
+
+            # If the box temp is greater than the off temp and we are
+            # already heating the pi, stop heating the pi.
+            elif temp_box > heat_off_temp and are_workers_active():
+                stop_workers()
+
+        # TODO make these show on page
+        if are_workers_active():
+            print("Pi is heating!")
+        else:
+            print("Pi is not heating!")
+
+        usage = get_cpu_usage()
+        print(f"Current CPU usage: {usage}%")
+
+        # Check again in a bit
+        time.sleep(5.0)
 
 def data_update_task():
     while True:
@@ -462,6 +529,11 @@ if __name__ == '__main__':
     temp_thread = Thread(target=temperature_task)
     temp_thread.daemon = True
     temp_thread.start()
+
+    # Start the task that heats the electrical box:
+    heat_thread = Thread(target=heat_box_task)
+    heat_thread.daemon = True
+    heat_thread.start()
 
     # Start the task that logs data to CSV files:
     log_thread = Thread(target=data_log_task)
