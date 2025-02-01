@@ -70,13 +70,17 @@ def save_config():
         to_dump = {
             "auto_mode" : global_vars.instance().get_value("auto_mode"),
             "sunrise_offset" : global_vars.instance().get_value("sunrise_offset"),
-            "sunset_offset" : global_vars.instance().get_value("sunset_offset")
+            "sunset_offset" : global_vars.instance().get_value("sunset_offset"),
+            "heat_on_temp" : global_vars.instance().get_value("heat_on_temp"),
+            "heat_off_temp" : global_vars.instance().get_value("heat_off_temp"),
+            "cpu_overheat_temp" : global_vars.instance().get_value("cpu_overheat_temp")
         }
         yaml.dump(to_dump, file)
 
 def load_config():
     ## Load the values from the YAML file
-    config_to_set = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0}
+    config_to_set = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0,
+                     "heat_on_temp": 32, "heat_off_temp": 36, "cpu_overheat_temp": 75}
     with open(config_filename, 'r') as file:
         yaml = YAML.YAML()
         content = file.read()
@@ -314,7 +318,7 @@ def door_task():
             # TODO add a heater to the control box so this condition is never encountered.
             # Need to turn on heating pi when box is below freezing ish
             # Need to turn off heating pi when CPU > 79 or when box is 5 degress above freezing ish
-            if temp_box is not None and temp_box < 10:
+            if temp_box is not None and temp_box < 0:
                 if door_state in ["opening", "closing"]:
                     door.stop()
                 else:
@@ -381,30 +385,30 @@ def heat_box_task():
         cpu_usage = psutil.cpu_percent(interval=1)
         return cpu_usage
 
-    # TODO make these variable
-    heat_on_temp = 33 # F
-    heat_off_temp = 36 # F
-    cpu_max_temp = 75 # C
-
     while True:
         # Get the current temperature of the electrical box
-        [temp_box, cpu_temp] = global_vars.instance().get_values(["temp_box", "cpu_temp"])
+        [temp_box, cpu_temp, heat_on_temp, heat_off_temp, cpu_overheat_temp] = \
+            global_vars.instance().get_values(["temp_box", "cpu_temp", \
+                "heat_on_temp", "heat_off_temp", "cpu_overheat_temp"])
 
         if temp_box is not None and cpu_temp is not None:
             # Prevent the CPU from over heating. If we are above the max,
             # shut down the workers.
-            if cpu_max_temp > cpu_max_temp and are_workers_active():
-                stop_workers()
-
-            # If the box temp is less than the on temp and we are
-            # not yet heating the pi, start heating the pi.
-            elif temp_box < heat_on_temp and not are_workers_active():
-                start_workers(4)
+            if cpu_temp > cpu_overheat_temp:
+                if are_workers_active():
+                    stop_workers()
 
             # If the box temp is greater than the off temp and we are
             # already heating the pi, stop heating the pi.
-            elif temp_box > heat_off_temp and are_workers_active():
-                stop_workers()
+            elif temp_box > heat_off_temp:
+                if are_workers_active():
+                    stop_workers()
+
+            # If the box temp is less than the on temp and we are
+            # not yet heating the pi, start heating the pi.
+            elif temp_box < heat_on_temp:
+                if not are_workers_active():
+                    start_workers(4)
 
         global_vars.instance().set_values({ \
             "cpu_usage": get_cpu_usage(), \
@@ -492,6 +496,15 @@ def handle_input_numbers(data):
     global_vars.instance().set_values({"sunrise_offset": int(sunrise_offset), "sunset_offset": int(sunset_offset)})
     save_config()
 
+@socketio.on('heater_control')
+def handle_input_numbers(data):
+    heat_on_temp = data['heat_on_temp']
+    heat_off_temp = data['heat_off_temp']
+    cpu_overheat_temp = data['cpu_overheat_temp']
+    global_vars.instance().set_values({"heat_on_temp": int(heat_on_temp), "heat_off_temp": int(heat_off_temp), \
+        "cpu_overheat_temp": int(cpu_overheat_temp)})
+    save_config()
+
 ##################################
 # Static page handlers:
 ##################################
@@ -504,7 +517,10 @@ def index():
         'index.html',
         auto_mode=global_vars.instance().get_value("auto_mode"),
         sunrise_offset=global_vars.instance().get_value("sunrise_offset"),
-        sunset_offset=global_vars.instance().get_value("sunset_offset")
+        sunset_offset=global_vars.instance().get_value("sunset_offset"),
+        heat_on_temp=global_vars.instance().get_value("heat_on_temp"),
+        heat_off_temp=global_vars.instance().get_value("heat_off_temp"),
+        cpu_overheat_temp=global_vars.instance().get_value("cpu_overheat_temp")
     )
 
 ##################################
