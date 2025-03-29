@@ -94,7 +94,7 @@ def get_all_data():
         sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
         temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
         temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
-        cpu_temp_min, cpu_temp_max, too_cold, temp_box, hum_box, \
+        cpu_temp_min, cpu_temp_max, temp_box, hum_box, \
         temp_box_min, temp_box_max, hum_box_min, hum_box_max, \
         cpu_usage, heater_state \
         = global_vars.instance().get_values(["temp_in", "hum_in", \
@@ -102,7 +102,7 @@ def get_all_data():
             "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
             "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
             "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
-            "cpu_temp_min", "cpu_temp_max", "too_cold", "temp_box", \
+            "cpu_temp_min", "cpu_temp_max", "temp_box", \
             "hum_box", "temp_box_min", "temp_box_max", "hum_box_min", \
             "hum_box_max", "cpu_usage", "heater_state"])
 
@@ -165,7 +165,6 @@ def get_all_data():
       'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
       'tu_open': time_until_open_str if time_until_open_str is not None else "",
       'tu_close': time_until_close_str if time_until_close_str is not None else "",
-      'too_cold' : "true" if too_cold else "false",
       'cpu_usage' : format_hum(cpu_usage),
       'heater_state' : "on" if heater_state else "off",
       'current_time' : datetime.now().strftime("%B %-d, %Y, %-I:%M:%S %p")
@@ -245,21 +244,36 @@ def temperature_task():
 
 # Background thread for managing coop door in real-time.
 def door_task():
-    door = DOOR()
+    # Configure coop door
+    door = DOOR(in1 = 24, in2 = 23)
     door_move_count = 0
     DOOR_MOVE_MAX = 35 # seconds
     first_iter = True
     sunrise = None
     door_state = None
-    door_override = None
+    door_override = False
     sunrise = None
     sunset = None
-    too_cold = False
+
+    # Define switch callbacks
+    def switch_open():
+        door_override = True
+        door.open()
+
+    def switch_close():
+        door_override = True
+        door.close()
+
+    def switch_neutral(nuetral_state="stopped"):
+        door_override = False
+        door.stop(state=nuetral_state)
+
+    # Configure 3-way switch
+    switch = SWITCH3(o_pin = 17, c_pin = 4, open_callback=switch_open, close_callback=switch_close)
 
     while True:
         # Get state and desired state:
         door_state = door.get_state()
-        door_override = door.get_override()
         d_door_state, auto_mode, temp_box = \
             global_vars.instance().get_values(["desired_door_state", "auto_mode", "temp_box"])
 
@@ -296,7 +310,8 @@ def door_task():
         # If we are in override mode, then the door is being moved by the switch.
         if door_override:
             # See if switch is turned off, if so, stop the door.
-            door.check_if_switch_neutral()
+            if door.is_switch_neutral():
+                switch_neutral()
 
             # Set the desired state to stopped, so that
             # when override switch is no longer being used,
@@ -307,51 +322,32 @@ def door_task():
         # If the door state does not match the desired door state, then
         # we need to move the door.
         elif door_state != d_door_state:
-            # Temperature fault protection. Driving the motor while it is too cold breaks
-            # the motor controller. We allow a user to do this with the manual switch, but
-            # we do not allow auto mode to open close the door if it is too cold.
-            #
-            # The temperature limit on the motor controller is -25C which is -13F. We need
-            # a safety factor on this however, because I noticed the motor performance
-            # degrading at ~10F. So for now lets make it 10F, for now.
-            #
-            # TODO add a heater to the control box so this condition is never encountered.
-            # Need to turn on heating pi when box is below freezing ish
-            # Need to turn off heating pi when CPU > 79 or when box is 5 degress above freezing ish
-            if temp_box is not None and temp_box < 0:
-                if door_state in ["opening", "closing"]:
-                    door.stop()
-                else:
-                    door.stop(door_state)
-                door_move_count = 0
-                too_cold = True
-            else:
-                match d_door_state:
-                    case "stopped":
-                        if door_state in ["open", "closed"]:
-                            door.stop(door_state)
-                            door_move_count = 0
-                        else:
-                            door.stop()
-                            door_move_count = 0
-                    case "open":
-                        if door_move_count <= DOOR_MOVE_MAX:
-                            door.open()
-                            door_move_count += 1
-                        else:
-                            door.stop("open")
-                            door_move_count = 0
-                    case "closed":
-                        if door_move_count <= DOOR_MOVE_MAX:
-                            door.close()
-                            door_move_count += 1
-                        else:
-                            door.stop("closed")
-                            door_move_count = 0
-                    case _:
+            match d_door_state:
+                case "stopped":
+                    if door_state in ["open", "closed"]:
+                        door.stop(door_state)
+                        door_move_count = 0
+                    else:
                         door.stop()
                         door_move_count = 0
-                        assert False, "Unknown state: " + str(d_door_state)
+                case "open":
+                    if door_move_count <= DOOR_MOVE_MAX:
+                        door.open()
+                        door_move_count += 1
+                    else:
+                        door.stop("open")
+                        door_move_count = 0
+                case "closed":
+                    if door_move_count <= DOOR_MOVE_MAX:
+                        door.close()
+                        door_move_count += 1
+                    else:
+                        door.stop("closed")
+                        door_move_count = 0
+                case _:
+                    door.stop()
+                    door_move_count = 0
+                    assert False, "Unknown state: " + str(d_door_state)
 
         # We are not in switch override, and the door is in the desired state. The door should be
         # stopped. We can do this most robustly by also checking the switch, which will stop the door
@@ -359,17 +355,17 @@ def door_task():
         # sometimes gets missed by the edge detection.
         else:
             # Check if switch off, if so, stop the door.
-            door.check_if_switch_neutral(nuetral_state=door.get_state())
+            if door.is_switch_neutral():
+                switch_neutral(nuetral_state=door.get_state())
+
             door_move_count = 0
 
         # Set global state
         first_iter = False
         door_state = door.get_state()
-        door_override = door.get_override()
         global_vars.instance().set_values({ \
             "state": door_state, \
             "override": door_override, \
-            "too_cold": too_cold, \
             "sunrise": sunrise, \
             "sunset": sunset \
         })

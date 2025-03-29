@@ -219,16 +219,10 @@
                     current_state = data.state;
                 }
             }
-            if (data.too_cold == "true") {
-                document.getElementById('too_cold').innerHTML = `<center><br>DOOR DISABLED (too cold)</center>`;
-            } else {
-                document.getElementById('too_cold').innerHTML = ``;
+            if (current_heater_state !== data.heater_state) {
+                document.getElementById('heater_state').innerHTML = `<center><img src="static/${data.heater_state}.png" alt="${data.heater_state}" width="90px"><br>${data.heater_state}</center>`;
+                current_heater_state = data.heater_state;
             }
-
-                if (current_heater_state !== data.heater_state) {
-                    document.getElementById('heater_state').innerHTML = `<center><img src="static/${data.heater_state}.png" alt="${data.heater_state}" width="90px"><br>${data.heater_state}</center>`;
-                    current_heater_state = data.heater_state;
-                }
         });
 
         function sendOpenCommand() {
@@ -321,7 +315,6 @@
                 <tr>
                     <td style="padding-bottom: 20px;">
                         <span id="state"></span>
-                        <span id="too_cold"></span>
                         <div class="button-container" style="margin-top: 20px;">
                             <button class="button close" onclick="sendCloseCommand()">Close</button>
                             <button class="button stop" onclick="sendStopCommand()">Stop</button>
