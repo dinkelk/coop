@@ -8,7 +8,7 @@ from astral import LocationInfo
 from astral.sun import sun
 from dht22 import DHT22
 from gpiozero import CPUTemperature
-from door import DOOR
+from door import DOOR, SWITCH3
 from compute_pi import start_workers, stop_workers, are_workers_active
 import time
 import psutil
@@ -71,6 +71,8 @@ def save_config():
             "auto_mode" : global_vars.instance().get_value("auto_mode"),
             "sunrise_offset" : global_vars.instance().get_value("sunrise_offset"),
             "sunset_offset" : global_vars.instance().get_value("sunset_offset"),
+            "run_sunrise_offset" : global_vars.instance().get_value("run_sunrise_offset"),
+            "run_sunset_offset" : global_vars.instance().get_value("run_sunset_offset"),
             "heat_on_temp" : global_vars.instance().get_value("heat_on_temp"),
             "heat_off_temp" : global_vars.instance().get_value("heat_off_temp"),
             "cpu_overheat_temp" : global_vars.instance().get_value("cpu_overheat_temp")
@@ -80,6 +82,7 @@ def save_config():
 def load_config():
     ## Load the values from the YAML file
     config_to_set = {"auto_mode": True, "sunrise_offset": 0, "sunset_offset": 0,
+                     "run_sunrise_offset": 0, "run_sunset_offset": 0,
                      "heat_on_temp": 32, "heat_off_temp": 36, "cpu_overheat_temp": 75}
     with open(config_filename, 'r') as file:
         yaml = YAML.YAML()
@@ -90,16 +93,18 @@ def load_config():
 
 def get_all_data():
     # Grab data safely from global store:
-    temp_in, hum_in, temp_out, hum_out, state, override, cpu_temp, \
+    temp_in, hum_in, temp_out, hum_out, state, run_state, override, cpu_temp, \
         sunrise, sunset, auto_mode, sunrise_offset, sunset_offset, \
+        run_sunrise_offset, run_sunset_offset, \
         temp_in_min, temp_in_max, hum_in_min, hum_in_max, \
         temp_out_min, temp_out_max, hum_out_min, hum_out_max, \
         cpu_temp_min, cpu_temp_max, temp_box, hum_box, \
         temp_box_min, temp_box_max, hum_box_min, hum_box_max, \
         cpu_usage, heater_state \
         = global_vars.instance().get_values(["temp_in", "hum_in", \
-            "temp_out", "hum_out", "state", "override", "cpu_temp", \
+            "temp_out", "hum_out", "state", "run_state", "override", "cpu_temp", \
             "sunrise", "sunset", "auto_mode", "sunrise_offset", "sunset_offset", \
+            "run_sunrise_offset", "run_sunset_offset", \
             "temp_in_min", "temp_in_max", "hum_in_min", "hum_in_max", \
             "temp_out_min", "temp_out_max", "hum_out_min", "hum_out_max", \
             "cpu_temp_min", "cpu_temp_max", "temp_box", \
@@ -109,25 +114,41 @@ def get_all_data():
     # Check if time until sunrise is positive
     time_until_open_str = None
     time_until_close_str = None
+    run_time_until_open_str = None
+    run_time_until_close_str = None
     if auto_mode == False:
         time_until_open_str = "disabled"
         time_until_close_str = "disabled"
+        run_time_until_open_str = "disabled"
+        run_time_until_close_str = "disabled"
     elif sunrise is not None and sunset is not None:
         # Assuming sunrise and sunset are datetime objects
         current_time = get_current_time()
         time_until_open = sunrise + timedelta(minutes=sunrise_offset) - current_time
         time_until_close = sunset + timedelta(minutes=sunset_offset) - current_time
+        run_time_until_open = sunrise + timedelta(minutes=run_sunrise_offset) - current_time
+        run_time_until_close = sunset + timedelta(minutes=run_sunset_offset) - current_time
 
         if time_until_open > timedelta(0):
             time_until_open_str = (datetime.min + time_until_open).strftime("%H:%M:%S")
         else:
             time_until_open_str = "passed"
 
+        if run_time_until_open > timedelta(0):
+            run_time_until_open_str = (datetime.min + run_time_until_open).strftime("%H:%M:%S")
+        else:
+            run_time_until_open_str = "passed"
+
         # Check if time until sunset is positive
         if time_until_close > timedelta(0):
             time_until_close_str = (datetime.min + time_until_close).strftime("%H:%M:%S")
         else:
             time_until_close_str = "passed"
+
+        if run_time_until_close > timedelta(0):
+            run_time_until_close_str = (datetime.min + run_time_until_close).strftime("%H:%M:%S")
+        else:
+            run_time_until_close_str = "passed"
 
     def format_temp(temp, units="F"):
         return ("%0.1f" % temp) + u'\N{DEGREE SIGN}' + units if temp is not None else ""
@@ -159,12 +180,15 @@ def get_all_data():
       'cpu_temp_min': format_temp(cpu_temp_min, units="C"),
       'cpu_temp_max': format_temp(cpu_temp_max, units="C"),
       'state': state if state is not None else "",
+      'run_state': run_state if run_state is not None else "",
       'override': state if state is not None and override else "off",
       'uptime': str(get_uptime()),
       'sunrise': sunrise.strftime("%-I:%M:%S %p") if sunrise is not None else "",
       'sunset': sunset.strftime("%-I:%M:%S %p") if sunset is not None else "",
       'tu_open': time_until_open_str if time_until_open_str is not None else "",
       'tu_close': time_until_close_str if time_until_close_str is not None else "",
+      'run_tu_open': run_time_until_open_str if run_time_until_open_str is not None else "",
+      'run_tu_close': run_time_until_close_str if run_time_until_close_str is not None else "",
       'cpu_usage' : format_hum(cpu_usage),
       'heater_state' : "on" if heater_state else "off",
       'current_time' : datetime.now().strftime("%B %-d, %Y, %-I:%M:%S %p")
@@ -246,11 +270,14 @@ def temperature_task():
 def door_task():
     # Configure coop door
     door = DOOR(in1 = 24, in2 = 23)
+    run_door = DOOR(in1 = 6, in2 = 5)
     door_move_count = 0
+    run_door_move_count = 0
     DOOR_MOVE_MAX = 35 # seconds
     first_iter = True
     sunrise = None
     door_state = None
+    run_door_state = None
     door_override = False
     sunrise = None
     sunset = None
@@ -274,8 +301,9 @@ def door_task():
     while True:
         # Get state and desired state:
         door_state = door.get_state()
-        d_door_state, auto_mode, temp_box = \
-            global_vars.instance().get_values(["desired_door_state", "auto_mode", "temp_box"])
+        run_door_state = run_door.get_state()
+        d_door_state, d_run_door_state, auto_mode, temp_box = \
+            global_vars.instance().get_values(["desired_door_state", "desired_run_door_state", "auto_mode", "temp_box"])
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
@@ -283,8 +311,11 @@ def door_task():
             # Get the current sunrise and sunset time, time of close, time of open, and current time.
             sunrise, sunset = get_sunrise_and_sunset()
             sunrise_offset, sunset_offset = global_vars.instance().get_values(["sunrise_offset", "sunset_offset"])
+            run_sunrise_offset, run_sunset_offset = global_vars.instance().get_values(["run_sunrise_offset", "run_sunset_offset"])
             open_time = sunrise + timedelta(minutes=sunrise_offset)
             close_time = sunset + timedelta(minutes=sunset_offset)
+            run_open_time = sunrise + timedelta(minutes=run_sunrise_offset)
+            run_close_time = sunset + timedelta(minutes=run_sunset_offset)
             current_time = get_current_time()
             time_window = timedelta(minutes=1)
 
@@ -297,20 +328,31 @@ def door_task():
                 else:
                     global_vars.instance().set_value("desired_door_state", "closed")
 
+                if current_time >= run_open_time and current_time < run_close_time:
+                    global_vars.instance().set_value("desired_run_door_state", "open")
+                else:
+                    global_vars.instance().set_value("desired_run_door_state", "closed")
+
             # If we are in the 1 minute after sunrise, command the desired door
             # state to open.
             if current_time >= open_time and current_time <= open_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "open")
+
+            if current_time >= run_open_time and current_time <= run_open_time + time_window:
+                global_vars.instance().set_value("desired_run_door_state", "open")
 
             # If we are in the 1 minute after sunset, command the desired door
             # state to closed.
             if current_time >= close_time and current_time <= close_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "closed")
 
+            if current_time >= run_close_time and current_time <= run_close_time + time_window:
+                global_vars.instance().set_value("desired_run_door_state", "closed")
+
         # If we are in override mode, then the door is being moved by the switch.
         if door_override:
             # See if switch is turned off, if so, stop the door.
-            if door.is_switch_neutral():
+            if switch.is_switch_neutral():
                 switch_neutral()
 
             # Set the desired state to stopped, so that
@@ -318,6 +360,7 @@ def door_task():
             # we don't move the motor until a new button is
             # pressed.
             global_vars.instance().set_value("desired_door_state", "stopped")
+            global_vars.instance().set_value("desired_run_door_state", "stopped")
 
         # If the door state does not match the desired door state, then
         # we need to move the door.
@@ -349,22 +392,52 @@ def door_task():
                     door_move_count = 0
                     assert False, "Unknown state: " + str(d_door_state)
 
+        elif run_door_state != d_run_door_state:
+            match d_run_door_state:
+                case "stopped":
+                    if run_door_state in ["open", "closed"]:
+                        run_door.stop(run_door_state)
+                        run_door_move_count = 0
+                    else:
+                        run_door.stop()
+                        run_door_move_count = 0
+                case "open":
+                    if run_door_move_count <= DOOR_MOVE_MAX:
+                        run_door.open()
+                        run_door_move_count += 1
+                    else:
+                        run_door.stop("open")
+                        run_door_move_count = 0
+                case "closed":
+                    if run_door_move_count <= DOOR_MOVE_MAX:
+                        run_door.close()
+                        run_door_move_count += 1
+                    else:
+                        run_door.stop("closed")
+                        run_door_move_count = 0
+                case _:
+                    run_door.stop()
+                    run_door_move_count = 0
+                    assert False, "Unknown state: " + str(d_run_door_state)
+
         # We are not in switch override, and the door is in the desired state. The door should be
         # stopped. We can do this most robustly by also checking the switch, which will stop the door
         # as long as it is in the nuetral position. This helps us catch a switch close or open that
         # sometimes gets missed by the edge detection.
         else:
             # Check if switch off, if so, stop the door.
-            if door.is_switch_neutral():
+            if switch.is_switch_neutral():
                 switch_neutral(nuetral_state=door.get_state())
 
             door_move_count = 0
+            run_door_move_count = 0
 
         # Set global state
         first_iter = False
         door_state = door.get_state()
         global_vars.instance().set_values({ \
             "state": door_state, \
+            "run_state": run_door_state, \
             "override": door_override, \
             "sunrise": sunrise, \
             "sunset": sunset \
@@ -474,6 +547,21 @@ def handle_stop():
     print('Stop button pressed')
     global_vars.instance().set_value("desired_door_state", "stopped")
 
+@socketio.on('run_open')
+def handle_open():
+    print('Open run button pressed')
+    global_vars.instance().set_value("desired_run_door_state", "open")
+
+@socketio.on('run_close')
+def handle_close():
+    print('Close run button pressed')
+    global_vars.instance().set_value("desired_run_door_state", "closed")
+
+@socketio.on('run_stop')
+def handle_stop():
+    print('Stop run button pressed')
+    global_vars.instance().set_value("desired_run_door_state", "stopped")
+
 @socketio.on('toggle')
 def handle_toggle(message):
     toggle_value = message['toggle']
@@ -489,7 +577,10 @@ def handle_toggle(message):
 def handle_input_numbers(data):
     sunrise_offset = data['sunrise_offset']
     sunset_offset = data['sunset_offset']
-    global_vars.instance().set_values({"sunrise_offset": int(sunrise_offset), "sunset_offset": int(sunset_offset)})
+    run_sunrise_offset = data['run_sunrise_offset']
+    run_sunset_offset = data['run_sunset_offset']
+    global_vars.instance().set_values({"sunrise_offset": int(sunrise_offset), "sunset_offset": int(sunset_offset), \
+        "run_sunrise_offset": int(run_sunrise_offset), "run_sunset_offset": int(run_sunset_offset)})
     save_config()
 
 @socketio.on('heater_control')
@@ -514,6 +605,8 @@ def index():
         auto_mode=global_vars.instance().get_value("auto_mode"),
         sunrise_offset=global_vars.instance().get_value("sunrise_offset"),
         sunset_offset=global_vars.instance().get_value("sunset_offset"),
+        run_sunrise_offset=global_vars.instance().get_value("run_sunrise_offset"),
+        run_sunset_offset=global_vars.instance().get_value("run_sunset_offset"),
         heat_on_temp=global_vars.instance().get_value("heat_on_temp"),
         heat_off_temp=global_vars.instance().get_value("heat_off_temp"),
         cpu_overheat_temp=global_vars.instance().get_value("cpu_overheat_temp")
@@ -526,6 +619,7 @@ def index():
 if __name__ == '__main__':
     # Initialize the desired door state:
     global_vars.instance().set_value("desired_door_state", "stopped")
+    global_vars.instance().set_value("desired_run_door_state", "stopped")
 
     # Load global configuration file into memory
     load_config()
