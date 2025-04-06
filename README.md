@@ -8,23 +8,26 @@
 
 This is the [Raspberry Pi](https://www.raspberrypi.com) based controller software running my chicken coop. It exhibits the following capabilities:
 
-  1. Automatic open and closing of coop door based on sunrise and sunset time (and configurable offset)
+  1. Automatic open and closing of coop and run doors based on sunrise and sunset time (and configurable offset)
   2. Open and closing of the coop door via an external 3 position switch
   3. Temperature and humidity sensing inside and outside the coop
-  4. Logging of all data to CSV files
-  5. A simple [Flask](https://flask.palletsprojects.com/en) web app to view temperature and humidity and command the door
+  4. Automatic heating of the electronics box by running the Pi at 100% CPU when it gets too cold
+  5. Logging of all data to CSV files
+  6. A simple [Flask](https://flask.palletsprojects.com/en) web app to view temperature and humidity and command the doors
 
 ## The Web App
 
 Below is the simple UI for the coop controller. It works well on a PC browser or phone.
 
- ![`Coop App`](img/app.png "app.png")
+ ![`Coop App`](img/app_new.png "app_new.png")
 
 ## How it is Wired Up
 
 This is how things are connected, drawn using [Fritzing](https://fritzing.org/).
 
- ![`Coop Wiring Diagram`](img/coop_bb.svg "coop_bb.svg")
+ ![`Coop Wiring Diagram`](img/coop_bb_new.png "coop_bb_new.png")
+
+**Note:** The [original design](img/coop_bb.svg) used an L298N motor driver, but this failed to function at cold temperatures. The new design uses the TB67H420FTG instead, which has proven much more reliable.
 
 ## How to Install
 
