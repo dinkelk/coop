@@ -278,21 +278,21 @@ def door_task():
     sunrise = None
     door_state = None
     run_door_state = None
-    door_override = False
+    door_override = [False]
     sunrise = None
     sunset = None
 
     # Define switch callbacks
     def switch_open():
-        door_override = True
+        door_override[0] = True
         door.open()
 
     def switch_close():
-        door_override = True
+        door_override[0] = True
         door.close()
 
     def switch_neutral(nuetral_state="stopped"):
-        door_override = False
+        door_override[0] = False
         door.stop(state=nuetral_state)
 
     # Configure 3-way switch
@@ -350,7 +350,7 @@ def door_task():
                 global_vars.instance().set_value("desired_run_door_state", "closed")
 
         # If we are in override mode, then the door is being moved by the switch.
-        if door_override:
+        if door_override[0]:
             # See if switch is turned off, if so, stop the door.
             if switch.is_switch_neutral():
                 switch_neutral()
@@ -360,7 +360,8 @@ def door_task():
             # we don't move the motor until a new button is
             # pressed.
             global_vars.instance().set_value("desired_door_state", "stopped")
-            global_vars.instance().set_value("desired_run_door_state", "stopped")
+            # global_vars.instance().set_value("desired_run_door_state", "stopped")
+            #^ We don't do this, for now, since the switch does not affect this door
 
         # If the door state does not match the desired door state, then
         # we need to move the door.
@@ -435,10 +436,11 @@ def door_task():
         # Set global state
         first_iter = False
         door_state = door.get_state()
+        run_door_state = run_door.get_state()
         global_vars.instance().set_values({ \
             "state": door_state, \
             "run_state": run_door_state, \
-            "override": door_override, \
+            "override": door_override[0], \
             "sunrise": sunrise, \
             "sunset": sunset \
         })
