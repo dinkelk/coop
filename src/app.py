@@ -279,6 +279,7 @@ def door_task():
     door_move_count = 0
     run_door_move_count = 0
     DOOR_MOVE_MAX = 35 # seconds
+    time_window = timedelta(minutes=1)
     first_iter = True
     sunrise = None
     door_state = None
@@ -309,17 +310,16 @@ def door_task():
         run_door_state = run_door.get_state()
         d_door_state, d_run_door_state, coop_auto_mode, run_auto_mode, temp_box = \
             global_vars.instance().get_values(["desired_door_state", "desired_run_door_state", "coop_auto_mode", "run_auto_mode", "temp_box"])
+        sunrise, sunset = get_sunrise_and_sunset()
+        current_time = get_current_time()
 
         # If we are in auto mode then open or close the door based on sunrise
         # or sunset times.
         if coop_auto_mode:
             # Get the current sunrise and sunset time, time of close, time of open, and current time.
-            sunrise, sunset = get_sunrise_and_sunset()
             sunrise_offset, sunset_offset = global_vars.instance().get_values(["sunrise_offset", "sunset_offset"])
             open_time = sunrise + timedelta(minutes=sunrise_offset)
             close_time = sunset + timedelta(minutes=sunset_offset)
-            current_time = get_current_time()
-            time_window = timedelta(minutes=1)
 
             # If we just booted up, then we need to make sure the door is in the
             # correct position. This prevents the door from being stuck in the wrong
@@ -339,6 +339,34 @@ def door_task():
             # state to closed.
             if current_time >= close_time and current_time <= close_time + time_window:
                 global_vars.instance().set_value("desired_door_state", "closed")
+
+        # If we are in auto mode then open or close the door based on sunrise
+        # or sunset times.
+        if run_auto_mode:
+            # Get the current sunrise and sunset time, time of close, time of open, and current time.
+            run_sunrise_offset, run_sunset_offset = global_vars.instance().get_values(["run_sunrise_offset", "run_sunset_offset"])
+            run_open_time = sunrise + timedelta(minutes=run_sunrise_offset)
+            run_close_time = sunset + timedelta(minutes=run_sunset_offset)
+
+            # If we just booted up, then we need to make sure the door is in the
+            # correct position. This prevents the door from being stuck in the wrong
+            # position due to an unfortunately timed power outage.
+            if first_iter:
+                if current_time >= run_open_time and current_time < run_close_time:
+                    global_vars.instance().set_value("desired_run_door_state", "open")
+                else:
+                    global_vars.instance().set_value("desired_run_door_state", "closed")
+
+            # If we are in the 1 minute after sunrise, command the desired door
+            # state to open.
+            if current_time >= run_open_time and current_time <= run_open_time + time_window:
+                global_vars.instance().set_value("desired_run_door_state", "open")
+
+            # If we are in the 1 minute after sunset, command the desired door
+            # state to closed.
+            if current_time >= run_close_time and current_time <= run_close_time + time_window:
+                global_vars.instance().set_value("desired_run_door_state", "closed")
+
 
         # If we are in override mode, then the door is being moved by the switch.
         if door_override[0]:
@@ -384,47 +412,6 @@ def door_task():
                     door_move_count = 0
                     assert False, "Unknown state: " + str(d_door_state)
 
-        # We are not in switch override, and the door is in the desired state. The door should be
-        # stopped. We can do this most robustly by also checking the switch, which will stop the door
-        # as long as it is in the nuetral position. This helps us catch a switch close or open that
-        # sometimes gets missed by the edge detection.
-        else:
-            # Check if switch off, if so, stop the door.
-            if switch.is_switch_neutral():
-                switch_neutral(nuetral_state=door.get_state())
-
-            door_move_count = 0
-
-        # If we are in auto mode then open or close the door based on sunrise
-        # or sunset times.
-        if run_auto_mode:
-            # Get the current sunrise and sunset time, time of close, time of open, and current time.
-            sunrise, sunset = get_sunrise_and_sunset()
-            run_sunrise_offset, run_sunset_offset = global_vars.instance().get_values(["run_sunrise_offset", "run_sunset_offset"])
-            run_open_time = sunrise + timedelta(minutes=run_sunrise_offset)
-            run_close_time = sunset + timedelta(minutes=run_sunset_offset)
-            current_time = get_current_time()
-            time_window = timedelta(minutes=1)
-
-            # If we just booted up, then we need to make sure the door is in the
-            # correct position. This prevents the door from being stuck in the wrong
-            # position due to an unfortunately timed power outage.
-            if first_iter:
-                if current_time >= run_open_time and current_time < run_close_time:
-                    global_vars.instance().set_value("desired_run_door_state", "open")
-                else:
-                    global_vars.instance().set_value("desired_run_door_state", "closed")
-
-            # If we are in the 1 minute after sunrise, command the desired door
-            # state to open.
-            if current_time >= run_open_time and current_time <= run_open_time + time_window:
-                global_vars.instance().set_value("desired_run_door_state", "open")
-
-            # If we are in the 1 minute after sunset, command the desired door
-            # state to closed.
-            if current_time >= run_close_time and current_time <= run_close_time + time_window:
-                global_vars.instance().set_value("desired_run_door_state", "closed")
-
         elif run_door_state != d_run_door_state:
             match d_run_door_state:
                 case "stopped":
@@ -462,7 +449,9 @@ def door_task():
             if switch.is_switch_neutral():
                 switch_neutral(nuetral_state=door.get_state())
 
+            door_move_count = 0
             run_door_move_count = 0
+
 
         # Set global state
         first_iter = False
