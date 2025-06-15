@@ -34,7 +34,7 @@
             align-items: center;
         }
 
-        .toggle {
+        .toggle_coop {
             width: 50px;
             height: 25px;
             background-color: #aaa;
@@ -43,7 +43,7 @@
             cursor: pointer;
         }
 
-        .toggle:before {
+        .toggle_coop:before {
             content: "";
             position: absolute;
             top: 1px;
@@ -55,15 +55,50 @@
             transition: transform 0.3s ease;
         }
 
-        .toggle.on {
+        .toggle_coop.on {
           background-color: #90d590;
         }
 
-        .toggle.on:before {
+        .toggle_coop.on:before {
             transform: translateX(25px);
         }
 
-        .toggle-label {
+        .toggle_coop-label {
+            margin-left: 10px;
+            font-size: 20px;
+        }
+
+
+        .toggle_run {
+            width: 50px;
+            height: 25px;
+            background-color: #aaa;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .toggle_run:before {
+            content: "";
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 23px;
+            height: 23px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle_run.on {
+          background-color: #90d590;
+        }
+
+        .toggle_run.on:before {
+            transform: translateX(25px);
+        }
+
+        .toggle_run-label {
             margin-left: 10px;
             font-size: 20px;
         }
@@ -263,17 +298,37 @@
             socket.emit('run_stop');
         }
 
-        function toggleSwitch() {
-            var toggle = document.getElementById('toggle');
-            toggle.classList.toggle('on');
-            var isOn = toggle.classList.contains('on');
-            socket.emit('toggle', { toggle: isOn });
-            var container = document.getElementById('auto_info');
-            if(isOn) {
-                container.style.display = "block";
-            } else {
-                container.style.display = "none";
-            }
+        function updateAutoInfoVisibility() {
+          const coopOn = document.getElementById('toggle_coop')
+                                .classList.contains('on');
+          const runOn  = document.getElementById('toggle_run')
+                                .classList.contains('on');
+
+          // show/hide the entire container
+          const container = document.getElementById('auto_info');
+          container.style.display = (coopOn || runOn) ? 'block' : 'none';
+
+          // show/hide all coop-specific bits
+          document.querySelectorAll('.coop-info')
+            .forEach(el => el.style.display = coopOn ? '' : 'none');
+
+          // show/hide all run-specific bits
+          document.querySelectorAll('.run-info')
+            .forEach(el => el.style.display = runOn ? '' : 'none');
+        }
+
+        function toggleCoopSwitch() {
+          const toggle = document.getElementById('toggle_coop');
+          const isOn   = toggle.classList.toggle('on');
+          socket.emit('toggle_coop', { toggle: isOn });
+          updateAutoInfoVisibility();
+        }
+
+        function toggleRunSwitch() {
+          const toggle = document.getElementById('toggle_run');
+          const isOn   = toggle.classList.toggle('on');
+          socket.emit('toggle_run', { toggle: isOn });
+          updateAutoInfoVisibility();
         }
 
         // Function to handle form submission
@@ -302,6 +357,8 @@
             // Send the values to the Flask app via WebSocket
             socket.emit('heater_control', { heat_on_temp, heat_off_temp, cpu_overheat_temp });
         }
+
+        document.addEventListener('DOMContentLoaded', updateAutoInfoVisibility);
     </script>
 </head>
 <body>
@@ -363,32 +420,67 @@
                     </td>
                 </tr>
             </table>
-            <div class="toggle-container" style="margin-bottom: 0px;">
-                <h4 class="title" style="margin-right: 20px; margin-top: 10px;">Auto Mode</h4>
-                <div class="toggle{% if auto_mode %} on{% endif %}" id="toggle" onclick="toggleSwitch()"></div>
+            <div class="toggle-container" style="all: revert; margin:15px; padding: 0;">
+              <table style="all: revert; border-collapse: collapse; border-spacing: 0; margin: 0; padding: 0;">
+                <tr style="all: revert; vertical-align: middle;">
+                  <td style="all: revert; padding: 10px 10px; margin: 0; line-height: 1;">
+                    <h4 style="all: revert; margin-left: 5px; margin-right: 20px; padding: 0; font-size: inherit; display: inline;">
+                      Coop Door Auto Mode
+                    </h4>
+                  </td>
+                  <td style="all: revert; padding: 2px 0; margin: 0;">
+                    <div class="toggle_coop{% if coop_auto_mode %} on{% endif %}"
+                         id="toggle_coop"
+                         onclick="toggleCoopSwitch()">
+                    </div>
+                  </td>
+                </tr>
+                <tr style="all: revert; vertical-align: middle;">
+                  <td style="all: revert; padding: 10px 10px; margin: 0; line-height: 1;">
+                    <h4 style="all: revert; margin-left: 5px; margin-right: 20px; padding: 0; font-size: inherit; display: inline;">
+                      Run Door Auto Mode
+                    </h4>
+                  </td>
+                  <td style="all: revert; padding: 2px 0; margin: 0;">
+                    <div class="toggle_run{% if run_auto_mode %} on{% endif %}"
+                         id="toggle_run"
+                         onclick="toggleRunSwitch()">
+                    </div>
+                  </td>
+                </tr>
+              </table>
             </div>
-            <div id="auto_info" class="auto_info {% if auto_mode %} on{% endif %}">
+
+            <div id="auto_info" class="auto_info {% if coop_auto_mode or run_auto_mode %} on{% endif %}">
             <table style="margin-top: 0px;">
                 <tr>
                     <td colspan="2" style="padding-top: 25px;">
-                        <div style="margin-bottom: 28px;"><center><b>Configuration</b></center></div>
+                      <div style="margin-bottom: 28px;"><center><b>Configuration</b></center></div>
                         <form onsubmit="handleSubmit(event)">
+
+                            <div class="coop-info">
                             <label for="sunrise_offset">Open <b>coop door</b> at sunrise plus </label>
                             <input type="number" id="sunrise_offset" name="sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunrise_offset }} required>
                             <label> minutes.</label><br/>
+                            </div>
 
-
+                            <div class="run-info">
                             <label for="run_sunrise_offset">Open <b>run door</b> at sunrise plus </label>
                             <input type="number" id="run_sunrise_offset" name="run_sunrise_offset" step="1" maxlength="4" style="width: 50px;" value={{ run_sunrise_offset }} required>
                             <label> minutes.</label><br/>
+                            </div>
 
+                            <div class="coop-info">
                             <label for="sunset_offset">Close <b>coop door</b> at sunset plus </label>
                             <input type="number" id="sunset_offset" name="sunset_offset" step="1" maxlength="4" style="width: 50px;" value={{ sunset_offset }} required>
                             <label> minutes.</label><br/>
+                            </div>
 
+                            <div class="run-info">
                             <label for="run_sunset_offset">Close <b>run door</b> at sunset plus </label>
                             <input type="number" id="run_sunset_offset" name="run_sunset_offset" step="1" maxlength="4" style="width: 50px;" value={{ run_sunset_offset }} required>
                             <label> minutes.</label><br/>
+                            </div>
 
                             <div class="button-container" style="margin-top: 30px; margin-bottom: 10px;">
                                 <button class="button open" type="submit">Save</button>
@@ -404,20 +496,20 @@
                     <td><span id="sunset"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Coop door opens in</b></td>
-                    <td><span id="tu_open"></span></td>
+                    <td class="coop-info"><b>Coop door opens in</b></td>
+                    <td class="coop-info"><span id="tu_open"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Run door opens in</b></td>
-                    <td><span id="run_tu_open"></span></td>
+                    <td class="run-info"><b>Run door opens in</b></td>
+                    <td class="run-info"><span id="run_tu_open"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Coop door closes in</b></td>
-                    <td><span id="tu_close"></span></td>
+                    <td class="coop-info"><b>Coop door closes in</b></td>
+                    <td class="coop-info"><span id="tu_close"></span></td>
                 </tr>
                 <tr>
-                    <td><b>Run door closes in</b></td>
-                    <td><span id="run_tu_close"></span></td>
+                    <td class="run-info"><b>Run door closes in</b></td>
+                    <td class="run-info"><span id="run_tu_close"></span></td>
                 </tr>
             </table>
             </div>

@@ -1,4 +1,5 @@
-auto_mode: true
+coop_auto_mode: true
+run_auto_mode: true
 sunrise_offset: -30
 sunset_offset: 45
 run_sunrise_offset: 0
